@@ -37,12 +37,17 @@ services:
         sync: false
       - key: CSRF_TRUSTED_ORIGINS
         sync: false
+      - key: RENDER_EXTERNAL_HOSTNAME
+        fromService:
+          type: web
+          name: proagua-backend
+          property: host
       - key: SESSION_COOKIE_SECURE
         value: "True"
       - key: CSRF_COOKIE_SECURE
         value: "True"
       - key: SECURE_SSL_REDIRECT
-        value: "True"
+        value: "False"
 
   - type: worker
     name: proagua-celery-worker
@@ -114,6 +119,7 @@ services:
     envVars:
       - key: NEXT_PUBLIC_API_BASE_URL
         sync: false
+        # Example value on Render dashboard: https://proagua-backend.onrender.com/api
 
   - type: redis
     name: proagua-redis

@@ -12,6 +12,7 @@ proagua_frontend/.env.local
 *.md
 !README.md
 *.xlsx
+*.csv
 pdf/
 insertion/
 

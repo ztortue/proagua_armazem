@@ -1,0 +1,58 @@
+ProAgua ERP · Registre des Décisions Métier · Mars 2026,,,,
+Source: Notes réunion SUEZ · Steve + Équipe Dev · 03/03/2026,,,,
+#,Sujet,Décision prise,Impact technique,Statut
+D1,"Approbation Saída
+(installation)","✅ RÉSOLUE — 03/03/2026
+
+Saída ne nécessite PAS d'approbation du Manager.
+Flux simplifié: BROUILLON → LIVRÉE directement.
+Valable aussi pour Entrada (même logique).","Backend: retirer permission IsManagerOrAdmin
+pour action 'livrer' sur flux INSTALACAO et ENTRADA.
+
+Frontend: masquer bouton 'Approuver' pour ces flux.
+Garder approbation pour Compras, Empréstimo, Transferência.","✅ À IMPLÉMENTER
+Mardi 03/03"
+D2,"Entrada dans
+Nova Requisição","✅ RÉSOLUE — 03/03/2026
+
+Entrada est intégrée dans Nova Requisição.
+Elle produit un Formulário comme les autres flux.
+Pas d'approbation requise (voir D1).
+Retirer Entrada du module Matériaux (Novo Movimento).","Backend: vérifier que DemandeLotCreateSerializer
+gère le flux ENTRADA correctement.
+
+Frontend: ajouter option ENTRADA dans le sélecteur
+de flux de Nova Requisição.
+Supprimer le bouton Entrada de la page Matériaux.","⚙️ PARTIEL
+Déjà partiellement
+fait — finaliser"
+D3,"Rôle Usuario /
+Store Keeper","✅ RÉSOLUE — 03/03/2026
+
+Pas de renommage du rôle 'USER' en base de données.
+Le champ 'poste' ou 'service' contiendra 'Store Keeper'.
+La navigation affichera 'Store Keeper' côté frontend.
+Aucun impact sur les permissions existantes.","Backend: aucun changement DB ni permissions.
+S'assurer que le champ 'poste' est bien exposé
+dans l'API /me/ et la page Utilisateurs.
+
+Frontend: mettre à jour labels de navigation
+'Usuario' → 'Store Keeper' dans menus et titres.
+PPTX Direction: mettre à jour slide navigation.","📋 À FAIRE
+Jeudi 05/03
+(page Utilisateurs)"
+D4,"Formulaire unique
+tous flux","⚠️ EN ATTENTE — réunion Mercredi 04/03
+
+Steve: 'même formulaire — titre change seulement'
+Question: variantes minimales par flux
+ou formulaire 100% générique?","Impact selon décision:
+→ Formulaire unique: 1 composant React partagé,
+   title prop dynamique selon flux.
+→ Variantes: 5 composants distincts mais cohérents.
+
+Recommandation Dev: formulaire unique avec
+champs conditionnels selon flux (plus maintenable).","⚠️ EN ATTENTE
+Décision Mer 04/03"
+,,,,
+Ce registre fait foi pour les développements à venir. Toute modification doit être validée conjointement par PO + Dev + SUEZ.,,,,

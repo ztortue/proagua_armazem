@@ -1,0 +1,18 @@
+Bugs/ris (pi enpòtan an premye)
+
+layout.tsx: layout la se Server Component, men li rele getUserFromToken() ki itilize localStorage/window. Rezilta: user ap toujou null sou server, non itilizatè/avatè a pa afiche kòrèkteman. Sa se yon bug lojik.
+page.tsx: line-clamp-3 itilize men plugin line-clamp pa aktive nan Tailwind config, kidonk clamp pa mache.
+page.tsx: “Total” itilize categories.length (sèlman paj aktyèl la), men li sipoze itilize count nan API a; sa bay move total.
+page.tsx: totalPages ka vin 0 si count = 0, sa bay “Paj 1 de 0”.
+page.tsx: lis “parent category” yo soti sèlman nan paj aktyèl la; ou p ap ka chwazi paran ki pa sou paj la.
+page.tsx ak layout.tsx: plizyè strings parèt ak encoding brize (Ã©, â—€…), sa endike fichye yo pa sove an UTF‑8 oswa encoding chanje. Sa gate UI a.
+
+==========================================================================
+
+Prompt pour amelioration
+
+1. wi nap sevi ak nom categorie yo, d'ailleur fok nou ajoute yon lyen ant materiel ak categorie.
+2. se selman description mwne pa vle yon plage_mesure
+3. Ou jan ou ekri l lan bon
+men konprann ke gen lot materye l mwen pa mete il faut que ou pran realite sa a en compte.
+en plus mwen pral bezwen ou modifye entrepot yo pou chak entrepot gen gwoup materyel pal. lhre mwen ale nan frontend lan nan Armazens epi mwen clicke sou yon nan armazenm totu materyel ki gen valeur armazem sa a dwe paret avek quantite yo, epi eta yo. Il faut que ou ajoute yon chan type materiel ki ap di si se yon materyel ki la pou pret (tankou yon casque, yon paire de gant oswa yon paire botte) oswa si se yon materiel ki la pou installe (tankou yon vanne, yon debitmetre, yon sonde pression yon capteur niveau) epi fok nou ka suiv etat materyel lan kote nou ka di si se yon materyel ki prete ki ap tounen nan x tan oswa si se yon materyel di en attente pou ale installer oswa si li deja installer

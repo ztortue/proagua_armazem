@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Formulário de Pedido de Material</title>
+ 
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+}
+ 
+.page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 15mm;
+    margin: auto;
+    background: white;
+}
+ 
+h1, h2 {
+    text-align: center;
+    margin: 5px 0;
+}
+ 
+.header-section {
+    margin-top: 20px;
+}
+ 
+.form-row {
+    display: flex;
+    margin-bottom: 8px;
+}
+ 
+.label {
+    width: 200px;
+    font-weight: bold;
+}
+ 
+.value {
+    border-bottom: 1px solid #000;
+    flex: 1;
+}
+ 
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+ 
+table th, table td {
+    border: 1px solid #000;
+    padding: 6px;
+    text-align: center;
+}
+ 
+.signature-section {
+    margin-top: 40px;
+}
+ 
+.signature-grid {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 30px;
+}
+ 
+.signature-box {
+    width: 30%;
+    text-align: center;
+}
+ 
+.signature-line {
+    margin-top: 60px;
+    border-top: 1px solid #000;
+}
+ 
+.notice {
+    margin-top: 40px;
+    font-size: 12px;
+}
+ 
+@media print {
+    body {
+        margin: 0;
+    }
+    .page {
+        box-shadow: none;
+    }
+}
+</style>
+</head>
+ 
+<body>
+ 
+<div class="page">
+ 
+<h2>PROJECTO PROÁGUA</h2>
+<h1>FORMULÁRIO DE PEDIDO DE MATERIAL</h1>
+ 
+<div class="header-section">
+<div class="form-row">
+<div class="label">Número do Pedido:</div>
+<div class="value">{{numero_pedido}}</div>
+</div>
+ 
+    <div class="form-row">
+<div class="label">Tipo de Material:</div>
+<div class="value">{{tipo_material}}</div>
+</div>
+ 
+    <div class="form-row">
+<div class="label">Ponto de Rede:</div>
+<div class="value">{{ponto_rede}}</div>
+</div>
+ 
+    <div class="form-row">
+<div class="label">Município:</div>
+<div class="value">{{municipio}}</div>
+</div>
+ 
+    <div class="form-row">
+<div class="label">Zona:</div>
+<div class="value">{{zona}}</div>
+</div>
+ 
+    <div class="form-row">
+<div class="label">Bairro:</div>
+<div class="value">{{bairro}}</div>
+</div>
+ 
+    <div class="form-row">
+<div class="label">Descrição da Liberação:</div>
+<div class="value">{{descricao}}</div>
+</div>
+ 
+    <div class="form-row">
+<div class="label">O Solicitante:</div>
+<div class="value">{{solicitante}}</div>
+</div>
+</div>
+ 
+<table>
+<thead>
+<tr>
+<th>ITEM</th>
+<th>COD</th>
+<th>DN</th>
+<th>DESIGNAÇÃO</th>
+<th>QTD</th>
+</tr>
+</thead>
+<tbody>
+        {{#itens}}
+<tr>
+<td>{{item}}</td>
+<td>{{cod}}</td>
+<td>{{dn}}</td>
+<td>{{designacao}}</td>
+<td>{{quantidade}}</td>
+</tr>
+        {{/itens}}
+</tbody>
+</table>
+ 
+<div class="signature-section">
+<div class="signature-grid">
+ 
+        <div class="signature-box">
+            ARMAZÉM 1 (SUEZ)
+<div class="signature-line"></div>
+            Entregue por:
+</div>
+ 
+        <div class="signature-box">
+            ARMAZÉM 2 (EPAL)
+<div class="signature-line"></div>
+            Entregue por:
+</div>
+ 
+        <div class="signature-box">
+            ARMAZÉM 3 (SUEZ)
+<div class="signature-line"></div>
+            Entregue por:
+</div>
+ 
+    </div>
+</div>
+ 
+<div class="notice">
+<b>AVISO:</b><br>
+1. Comunique imediatamente o ocorrido ao setor responsável (Logística/Gestão de Materiais).<br>
+2. Não descarte ou repare o item sem autorização prévia.
+</div>
+ 
+</div>
+ 
+</body>
+</html>

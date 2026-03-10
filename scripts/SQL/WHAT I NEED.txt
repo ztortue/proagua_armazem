@@ -1,0 +1,20 @@
+WHAT I NEED
+
+Baze sou tout fichye mwen voye ba ou yo pou nou fe yon koreksyon important.
+
+Men sak rive, le utilisateur an ale sou movimentos ta sanble serveur yo, kit se Django kit se node.js, pa we l tankou yon admin user men Selman tankou yon simple user.  Sa vin fe ke Carte ki ap jere kreyasyon demann yo ak ajout materiel yo pa janm ka mache normal. Serveur pa idantifye okenn fot ni okenn erreur syntaxe Selman yo di user an li pa admin li pa ka fe aksyon yo.  
+
+Verifye eske se anndan context/AuthContext.js ki gen yon pwoblem,
+Verifye eske gen yon move itilization se AuthContext.js nan youn nan composant yo ki anndan proagua2/frontend/src/components
+Verifye eske gen yon move itilization you nna konpozan yo ki nan proagua2/frontend/src/components anndan fichye proagua2/frontend/src/app/movimentos/page.js
+
+Si w jwenn erreur
+
+1. Groupe yo par type erreur
+2. Mete pwopozisyon nouvo prompt pou koreksyon chak.
+3. Pa utilize jsx, mfx
+4. Toujou sevi avek fichye js (donc se Selman fichye javascript pou nou sevi)
+5. Fok nou fe test sou api yo pou nou we eske tout bagay ap mache bien, konsa nou ka verifye eske se nan backend lan ki gen yon pwoblem.
+
+JOB DESCRIPTION:
+Etidyan DevOps pou l vin yon Full Stack Developer nan Django ak PostgreSQL ak NodeJS ak REACT ki ap fe yon pwoje pou jere plusieurs magasins e jere antre soti nan chak magasin. Li dwe paret tankou yon ERP friendly pou nenpot moun ki pa fo nan informatique en ki konn li portugais bien ka travay avek ERP sa a.

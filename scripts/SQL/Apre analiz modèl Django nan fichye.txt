@@ -1,0 +1,54 @@
+Apre analiz modèl Django nan fichye models.py mwen uploade a, kisa w panse ki manke oswa ki ta ka amelyore? Eske w ka fè yon revizyon konplè modèl yo ak sijesyon pou:
+- Ajoute relasyon ki manke
+- Korije erè nan kòd (tankou doub __str__ nan Materiel)
+- Amelyore estrikti baz done a pou yon pi bon jesyon magazen an
+- Sijere lòt modèl nesesè pou yon ERP konplè
+
+Konprann ke mwen mande ou sa paske mwen bezwen yon sistem jesyon stock ki ka:
+- Kalkile stock aktyèl chak materyèl an tan reyèl
+- Jere nivo stock minimòm ak maksimòm
+- Bay alert lè stock rive ba
+- Fè rapò sou mouvman stock
+Eske w ka korije/kontribye metòd 'stock_actuel' ki nan modèl Materiel la epi ajoute fonksionalite alert? (oswa eske mwen met kite se Frontend lan ki jere sa?)
+
+Mwen vle yon sistem demann materyèl kote:
+- Itilizatè ka fè demann anlòt (DemandeLot ak DemandeItem)
+- Responsab ka apwouve oswa refize demann (admin oswa manager)
+- Gen traçabilité tout demann
+- Ka jere plizyè materyèl nan yon sèl demann
+Eske w ka eksplike kijan pou mwen konplete sistem demann ki kòmanse deja nan modèl yo?
+
+Kijan mwen ta dwe òganize kontwòl aksè nan platfòm nan selon wòl itilizatè yo (ADMIN, MANAGER, USER)? Mwen bezwen:
+- Restriksyon pou sèten aksyon
+- Log otorizasyon pou mouvman
+- Jesyon pèmisyon espesifik
+Eske w ka ede mwen konplete sistem otorizasyon an ak règ aksè?
+
+Pou yon bon ERP magazen, ki kalite rapò ak estatistik mwen ta dwe genyen? Mwen ta vle nan frontend lan:
+- Dashboard pou jesyonè a 
+- Rapò konsomasyon materyèl pa pwojè
+- Istorik mouvman
+- Analiz pèfòmans founisè
+Eske w ka sijere estrikti pou modèl Rapò ak kijan pou jenere done sa yo?
+
+Ki lòt fonksyonalite ERP tipik mwen ta dwe ajoute? Mwen panse a:
+- Sistem faktirasyon
+- Jesyon kout founisè
+- Planifikasyon achats
+- Traçabilité lot
+- Sistem notifikasyon
+Pou chak, eske w ka dekri modèl Django ki nesesè?
+
+Mwen vle platfòm nan ka kominike ak sistem ekstèn. Mwen bezwen:
+- API REST pou web application anvan le nou fini l nap panse ak mobile apps
+- Entegrasyon ak sistem finans
+- Ekspòtasyon done
+- Webhooks pou notifikasyon
+Kijan mwen ta dwe estriktire API yo ak ki endpoints ki nesesè pou yon ERP magazen?
+
+Avèk gwo kantite mouvman ak materyèl, kijan mwen ka optimize baz done a?
+- Indexasyon
+- Cache
+- Kalkil stock asenkron
+- Archiving done vye
+Eske w ka bay konsèy teknik pou asire bon pèfòmans platfòm nan?

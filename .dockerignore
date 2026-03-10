@@ -1,0 +1,51 @@
+# VCS
+.git
+.gitignore
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+!proagua_backend/.env.example
+!proagua_frontend/.env.example
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+av/
+.venv/
+venv/
+
+# Node / Next
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+
+# Runtime data and local assets
+media/
+staticfiles/
+backups/
+pdf/
+img/
+insertion/
+local_tools/
+
+# Large docs / exports / temp
+*.md
+*.xlsx
+*.xls
+*.csv
+*.sql
+*.log
+*.tmp
+*.bak
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

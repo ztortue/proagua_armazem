@@ -1,0 +1,31 @@
+﻿# VCS / metadata
+.git
+.gitignore
+
+# Env / secrets
+.env
+.env.*
+
+# Docs / office files / local export folders
+*.md
+*.xlsx
+pdf/
+insertion/
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Build / logs
+build/
+dist/
+coverage/
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+img/
+local_tools/

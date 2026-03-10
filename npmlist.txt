@@ -1,0 +1,23 @@
+﻿proagua_frontend@0.1.0 C:\Users\Steve Baptiste\DevOps\proagua3\proagua_frontend
++-- @emnapi/core@1.7.1 extraneous
++-- @emnapi/runtime@1.7.1 extraneous
++-- @emnapi/wasi-threads@1.1.0 extraneous
++-- @heroicons/react@2.2.0
++-- @napi-rs/wasm-runtime@0.2.12 extraneous
++-- @tailwindcss/postcss@4.1.17
++-- @tybys/wasm-util@0.10.1 extraneous
++-- @types/node@20.19.25
++-- @types/react-dom@19.2.3
++-- @types/react@19.2.7
++-- axios@1.13.5
++-- babel-plugin-react-compiler@1.0.0
++-- daisyui@5.5.5
++-- eslint-config-next@16.1.6
++-- eslint@9.39.3
++-- lucide-react@0.575.0
++-- next@16.1.6
++-- react-dom@19.2.0
++-- react@19.2.0
++-- tailwindcss@4.1.17
+`-- typescript@5.9.3
+

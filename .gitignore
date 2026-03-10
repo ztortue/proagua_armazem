@@ -1,0 +1,55 @@
+﻿# Local-only tools/scripts (do not commit to remote)
+local_tools/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+proagua_backend/.env
+proagua_frontend/.env.local
+
+# Docs / office files / local export folders
+*.md
+!README.md
+*.xlsx
+pdf/
+insertion/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+venv/
+.venv/
+av/
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Build / coverage
+build/
+dist/
+coverage/
+
+# Logs
+*.log
+logs*.txt
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local runtime artifacts
+media/
+staticfiles/
+img/
+backups/
+*.docx

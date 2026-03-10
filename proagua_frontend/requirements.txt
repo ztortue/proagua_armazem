@@ -1,0 +1,16 @@
+# Frontend requirements (Next.js) - updated 2026-03-06
+# Prerequisites:
+# - Node.js >= 20
+# - npm >= 10
+#
+# Install dependencies with:
+# npm install
+#
+# Core packages (defined in package.json):
+# next@^16.1.6
+# react@19.2.0
+# react-dom@19.2.0
+# axios@^1.13.2
+# @heroicons/react@^2.2.0
+# daisyui@^5.5.5
+# lucide-react@^0.575.0

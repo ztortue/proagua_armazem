@@ -1,0 +1,40 @@
+﻿# VCS / metadata
+.git
+.gitignore
+
+# Env / secrets
+.env
+.env.*
+
+# Docs / office files / local export folders
+*.md
+*.xlsx
+pdf/
+insertion/
+
+# Python cache / venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+venv/
+.venv/
+av/
+
+# Build / logs
+build/
+dist/
+coverage/
+*.log
+
+# Local runtime artifacts
+media/
+staticfiles/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+img/
+local_tools/

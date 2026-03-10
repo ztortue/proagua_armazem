@@ -17,8 +17,4 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . .
 
-RUN chmod +x /app/proagua_backend/entrypoint.web.sh
-
-EXPOSE 8000
-
-CMD ["/app/proagua_backend/entrypoint.web.sh"]
+CMD ["celery", "-A", "proagua_backend", "beat", "-l", "info"]

@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config
 from celery.schedules import crontab
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -45,6 +46,7 @@ SITE_ID = 1
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -84,19 +86,29 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'proagua_backend.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('POSTGRES_DB', default='proagua_armazem'),
-        'USER': config('POSTGRES_USER', default='postgres'),
-        'PASSWORD': config('POSTGRES_PASSWORD', default='p3m@cL!nuxGNU'),
-        'HOST': config('POSTGRES_HOST', default='localhost'),
-        'PORT': config('POSTGRES_PORT', default='5432'),
-        'OPTIONS': {
-            'options': '-c client_encoding=UTF-8',
-        },
+DATABASE_URL = config('DATABASE_URL', default='')
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=not DEBUG,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='proagua_armazem'),
+            'USER': config('POSTGRES_USER', default='postgres'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default='p3m@cL!nuxGNU'),
+            'HOST': config('POSTGRES_HOST', default='localhost'),
+            'PORT': config('POSTGRES_PORT', default='5432'),
+            'OPTIONS': {
+                'options': '-c client_encoding=UTF-8',
+            },
+        }
+    }
 
 AUTH_USER_MODEL = 'api.Utilisateur'
 
@@ -140,9 +152,12 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+
+REDIS_URL = config('REDIS_URL', default='')
 
 # ============================================================================
 # CACHE CONFIGURATION
@@ -152,7 +167,7 @@ if USE_REDIS_CACHE:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': config('REDIS_CACHE_URL', default='redis://127.0.0.1:6379/1'),
+            'LOCATION': config('REDIS_CACHE_URL', default=REDIS_URL or 'redis://127.0.0.1:6379/1'),
             'KEY_PREFIX': 'proagua',
             'TIMEOUT': 300,
         }
@@ -166,8 +181,8 @@ else:
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=REDIS_URL or 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=REDIS_URL or 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_BEAT_SCHEDULE = {
@@ -208,6 +223,14 @@ CSRF_TRUSTED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
+
+RENDER_EXTERNAL_HOSTNAME = config('RENDER_EXTERNAL_HOSTNAME', default='').strip()
+if RENDER_EXTERNAL_HOSTNAME:
+    if RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    render_origin = f'https://{RENDER_EXTERNAL_HOSTNAME}'
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 # Security defaults for deployment (override by env when needed)
 SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', default=not DEBUG)

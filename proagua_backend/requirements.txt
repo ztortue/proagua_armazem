@@ -16,6 +16,7 @@ dj-rest-auth==7.0.1
 Django==5.2.8
 django-allauth==65.13.1
 django-cors-headers==4.9.0
+dj-database-url==3.0.1
 django-filter==25.2
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
@@ -42,3 +43,4 @@ uritemplate==4.2.0
 urllib3==2.5.0
 vine==5.1.0
 wcwidth==0.2.14
+whitenoise==6.11.0

@@ -123,12 +123,12 @@ services:
 
   - type: redis
     name: proagua-redis
-    plan: starter
+    plan: basic
     ipAllowList: []
     maxmemoryPolicy: noeviction
 
 databases:
   - name: proagua-db
-    plan: starter
+    plan: basic
     databaseName: proagua_armazem
     user: proagua

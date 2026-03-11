@@ -43,7 +43,7 @@ export default function LoginPage() {
       {/* Background pi klè */}
       <div className="fixed inset-0 -z-10">
         <img
-          src="/img2Login.png"
+          src="/img2Login.jpg"
           alt="ProAgua - Suez International"
           className="w-full h-full object-cover brightness-110"
         />

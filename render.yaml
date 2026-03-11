@@ -125,12 +125,12 @@ services:
 
   - type: redis
     name: proagua-redis
-    plan: professional
+    plan: starter
     ipAllowList: []
     maxmemoryPolicy: noeviction
 
 databases:
   - name: proagua-db
-    plan: professional
+    plan: starter
     databaseName: proagua_armazem
     user: proagua

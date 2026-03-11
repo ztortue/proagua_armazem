@@ -1,9 +1,33 @@
+# render.yaml — ProAgua ERP
+# Blueprint Render.com — Plan Professional
+# Syntaxe validée selon docs Render 2025/2026
+#
+# CHANGEMENTS CRITIQUES vs anciennes versions:
+#   ✅ env: docker         → runtime: docker   (env est déprécié)
+#   ✅ plan: starter       → instanceType: basic  (pour databases — flexible plans)
+#   ✅ type: redis         → type: keyvalue    (redis est un alias déprécié)
+#   ✅ plan: starter       sur services web/worker = encore valide
+#
+# VARIABLES À DÉFINIR MANUELLEMENT dans Render Dashboard après le premier deploy:
+#   proagua-backend:
+#     SECRET_KEY            → copier depuis .env local
+#     ALLOWED_HOSTS         → proagua-backend.onrender.com
+#     CORS_ALLOWED_ORIGINS  → https://proagua-frontend.onrender.com
+#     CSRF_TRUSTED_ORIGINS  → https://proagua-frontend.onrender.com,https://proagua-backend.onrender.com
+#   proagua-frontend:
+#     NEXT_PUBLIC_API_BASE_URL → https://proagua-backend.onrender.com/api
+
 services:
+
+  # ─────────────────────────────────────────────────────────
+  # 1. Django Backend (Web Service)
+  # ─────────────────────────────────────────────────────────
   - type: web
     name: proagua-backend
-    env: docker
+    runtime: docker
     dockerContext: .
     dockerfilePath: ./proagua_backend/Dockerfile
+    plan: starter
     healthCheckPath: /admin/login/
     envVars:
       - key: SECRET_KEY
@@ -16,17 +40,22 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: CELERY_BROKER_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: CELERY_RESULT_BACKEND
         fromService:
-          type: redis
+          type: keyvalue
+          name: proagua-redis
+          property: connectionString
+      - key: REDIS_CACHE_URL
+        fromService:
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: USE_REDIS_CACHE
@@ -48,12 +77,18 @@ services:
         value: "True"
       - key: SECURE_SSL_REDIRECT
         value: "False"
+      - key: CELERY_DAILY_REPORT_TASK
+        value: "api.tasks.task_generate_daily_rapport_quotidien"
 
+  # ─────────────────────────────────────────────────────────
+  # 2. Celery Worker
+  # ─────────────────────────────────────────────────────────
   - type: worker
     name: proagua-celery-worker
-    env: docker
+    runtime: docker
     dockerContext: .
     dockerfilePath: ./proagua_backend/Dockerfile.worker
+    plan: starter
     envVars:
       - key: SECRET_KEY
         sync: false
@@ -65,27 +100,38 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: CELERY_BROKER_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: CELERY_RESULT_BACKEND
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: USE_REDIS_CACHE
         value: "True"
+      - key: REDIS_CACHE_URL
+        fromService:
+          type: keyvalue
+          name: proagua-redis
+          property: connectionString
+      - key: CELERY_DAILY_REPORT_TASK
+        value: "api.tasks.task_generate_daily_rapport_quotidien"
 
+  # ─────────────────────────────────────────────────────────
+  # 3. Celery Beat (scheduler)
+  # ─────────────────────────────────────────────────────────
   - type: worker
     name: proagua-celery-beat
-    env: docker
+    runtime: docker
     dockerContext: .
     dockerfilePath: ./proagua_backend/Dockerfile.beat
+    plan: starter
     envVars:
       - key: SECRET_KEY
         sync: false
@@ -97,40 +143,66 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: CELERY_BROKER_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
       - key: CELERY_RESULT_BACKEND
         fromService:
-          type: redis
+          type: keyvalue
           name: proagua-redis
           property: connectionString
-      - key: USE_REDIS_CACHE
-        value: "True"
+      - key: CELERY_DAILY_REPORT_TASK
+        value: "api.tasks.task_generate_daily_rapport_quotidien"
 
+  # ─────────────────────────────────────────────────────────
+  # 4. Next.js Frontend
+  # ─────────────────────────────────────────────────────────
   - type: web
     name: proagua-frontend
-    env: docker
+    runtime: docker
     dockerContext: ./proagua_frontend
     dockerfilePath: ./proagua_frontend/Dockerfile
+    plan: starter
     envVars:
       - key: NEXT_PUBLIC_API_BASE_URL
         sync: false
-        # Example: https://proagua-backend.onrender.com/api
+      - key: NODE_ENV
+        value: "production"
 
-  - type: redis
+  # ─────────────────────────────────────────────────────────
+  # 5. Redis / Key Value
+  #    "redis" est un alias déprécié → utiliser "keyvalue"
+  #    plan: starter = encore valide pour keyvalue
+  # ─────────────────────────────────────────────────────────
+  - type: keyvalue
     name: proagua-redis
     plan: starter
-    ipAllowList: []
     maxmemoryPolicy: noeviction
+    ipAllowList: []
 
 databases:
+  # ─────────────────────────────────────────────────────────
+  # 6. PostgreSQL — Flexible Plans (nouveau système Render)
+  #
+  #    AVANT (legacy, plus valide pour nouvelles DB):
+  #      plan: starter  ← REJETÉ par Render depuis oct. 2024
+  #
+  #    MAINTENANT (flexible plans):
+  #      instanceType: basic  ← compute (RAM/CPU)
+  #      diskSizeGB: 5        ← storage indépendant (multiple de 5 GB, min 5)
+  #
+  #    Cohérence avec .env et docker-compose:
+  #      databaseName: proagua_armazem ✅ (= POSTGRES_DB dans .env)
+  #      user: proagua (Render génère le mot de passe automatiquement)
+  #      settings.py utilise DATABASE_URL en priorité → POSTGRES_* non requis sur Render
+  # ─────────────────────────────────────────────────────────
   - name: proagua-db
-    plan: starter
     databaseName: proagua_armazem
     user: proagua
+    instanceType: basic
+    diskSizeGB: 5

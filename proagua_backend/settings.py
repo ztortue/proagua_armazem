@@ -101,7 +101,7 @@ else:
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': config('POSTGRES_DB', default='proagua_armazem'),
             'USER': config('POSTGRES_USER', default='postgres'),
-            'PASSWORD': config('POSTGRES_PASSWORD', default='p3m@cL!nuxGNU'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default='p3m4cL!nuxGNU'),
             'HOST': config('POSTGRES_HOST', default='localhost'),
             'PORT': config('POSTGRES_PORT', default='5432'),
             'OPTIONS': {

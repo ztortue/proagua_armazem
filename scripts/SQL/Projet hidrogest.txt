@@ -135,7 +135,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'hidrogest_db',
         'USER': 'postgres',
-        'PASSWORD': 'p3m@cL!nuxGNU',
+        'PASSWORD': 'p3m4cL!nuxGNU',
         'HOST': 'localhost',
         'PORT': '5432',
     }

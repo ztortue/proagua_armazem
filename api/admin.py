@@ -8,7 +8,7 @@ from .models import (
     Utilisateur,
     UtilisateurFinal,
     UsoTipico,
-    Categorie, Fournisseur,
+    Categorie, SousCategorie, Fournisseur,
     ProjetChantier, Entrepot,
     Materiel, StockEntrepot, 
     Mouvement,Zone, Corredor, 
@@ -36,7 +36,22 @@ class CategorieAdmin(admin.ModelAdmin):
     
     def nb_materiels(self, obj):
         return obj.materiels.count()
-    nb_materiels.short_description = 'Nb Matériels'
+    nb_materiels.short_description = 'Nb Materiels'
+
+@admin.register(SousCategorie)
+class SousCategorieAdmin(admin.ModelAdmin):
+    list_display = ('nom', 'categorie', 'famille', 'nb_materiels')
+    list_filter = ('categorie', 'categorie__famille')
+    search_fields = ('nom', 'description', 'categorie__nom', 'categorie__famille__nom')
+    ordering = ('categorie__famille__nom', 'categorie__nom', 'nom')
+
+    def famille(self, obj):
+        return obj.categorie.famille if obj.categorie else None
+    famille.short_description = 'Famille'
+
+    def nb_materiels(self, obj):
+        return obj.materiels.count()
+    nb_materiels.short_description = 'Nb Materiels'
 
 class UtilisateurCreationForm(forms.ModelForm):
     password1 = forms.CharField(label="Password", widget=forms.PasswordInput)

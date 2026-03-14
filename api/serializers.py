@@ -907,19 +907,32 @@ class ProjetChantierSerializer(serializers.ModelSerializer):
 # api/serializers.py – Ajoute sa anba lòt serializer yo
 class CategorieSerializer(serializers.ModelSerializer):
     famille = FamilleSerializer(read_only=True)
-    # parent = serializers.PrimaryKeyRelatedField(queryset=Categorie.objects.all(), allow_null=True, required=False)
+    famille_id = serializers.PrimaryKeyRelatedField(
+        queryset=Famille.objects.all(),
+        source='famille',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
     parent_nom = serializers.CharField(source='parent.nom', read_only=True)
     class Meta:
         model = Categorie
-        fields = ['id', 'nom', 'description', 'famille', 'parent', 'parent_nom', 'chemin_complet']  # Tout chan yo (nom, description, parent)
+        fields = ['id', 'nom', 'description', 'famille', 'famille_id', 'parent', 'parent_nom', 'chemin_complet']  # Tout chan yo (nom, description, parent)
 
 
 class SousCategorieSerializer(serializers.ModelSerializer):
+    categorie_id = serializers.PrimaryKeyRelatedField(
+        queryset=Categorie.objects.all(),
+        source='categorie',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
     categorie_nom = serializers.CharField(source='categorie.nom', read_only=True)
 
     class Meta:
         model = SousCategorie
-        fields = ['id', 'nom', 'description', 'categorie', 'categorie_nom']
+        fields = ['id', 'nom', 'description', 'categorie', 'categorie_id', 'categorie_nom']
 
 
 class FournisseurSerializer(serializers.ModelSerializer):

@@ -52,6 +52,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/users', label: 'Usuários', icon: UserGroupIcon, iconColor: 'text-secondary', managerOrAdmin: true },
   { href: '/dashboard/familles', label: 'Famílias', icon: QueueListIcon, iconColor: 'text-primary', managerOrAdmin: true },
   { href: '/dashboard/categories', label: 'Categorias', icon: QueueListIcon, iconColor: 'text-accent', adminOnly: true },
+  { href: '/dashboard/sous-familles', label: 'Subfamílias', icon: QueueListIcon, iconColor: 'text-secondary' },
   { href: '/dashboard/fournisseurs', label: 'Fornecedores', icon: WrenchScrewdriverIcon, iconColor: 'text-secondary', adminOnly: true },
 ];
 

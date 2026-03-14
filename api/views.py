@@ -1733,9 +1733,7 @@ class SousCategorieViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [IsAuthenticated()]
-        if self.action == 'destroy':
-            return [IsAdmin()]
-        return [IsManagerOrAdmin()]
+        return [IsOperationalUser()]
 
 
 # ===================================================================

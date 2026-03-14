@@ -8,8 +8,17 @@ type Categorie = {
   id: number;
   nom: string;
   description?: string;
+  famille?: {
+    id: number;
+    nom: string;
+  } | null;
   parent?: number | null;
   parent_nom?: string | null;
+};
+
+type Famille = {
+  id: number;
+  nom: string;
 };
 
 type PageResponse = {
@@ -40,10 +49,11 @@ export default function CategoriesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [allCategories, setAllCategories] = useState<Categorie[]>([]);
+  const [familles, setFamilles] = useState<Famille[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Categorie | null>(null);
-  const [form, setForm] = useState({ nom: '', description: '', parent: '' });
+  const [form, setForm] = useState({ nom: '', description: '', famille_id: '' });
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Categorie | null>(null);
   const [materiais, setMateriais] = useState<Materiel[]>([]);
@@ -94,9 +104,21 @@ export default function CategoriesPage() {
     }
   };
 
+  const loadFamilles = async () => {
+    try {
+      const res = await api.get('/familles/');
+      const rows = Array.isArray(res.data) ? res.data : res.data.results || [];
+      setFamilles(rows);
+    } catch (error) {
+      console.error('Erro ao carregar familias:', error);
+      setFamilles([]);
+    }
+  };
+
   useEffect(() => {
     load(1);
     loadAllCategories();
+    loadFamilles();
   }, []);
 
   const loadEntrepots = async () => {
@@ -282,7 +304,7 @@ export default function CategoriesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ nom: '', description: '', parent: '' });
+    setForm({ nom: '', description: '', famille_id: '' });
     setModalOpen(true);
   };
 
@@ -291,16 +313,21 @@ export default function CategoriesPage() {
     setForm({
       nom: cat.nom,
       description: cat.description || '',
-      parent: cat.parent ? String(cat.parent) : '',
+      famille_id: cat.famille?.id ? String(cat.famille.id) : '',
     });
     setModalOpen(true);
   };
 
   const handleSubmit = async () => {
+    if (!form.famille_id) {
+      alert('Selecione a familia da categoria.');
+      return;
+    }
+
     const payload = {
       nom: form.nom.trim(),
       description: form.description.trim() || '',
-      ...(form.parent && { parent: Number(form.parent) }),
+      ...(form.famille_id && { famille_id: Number(form.famille_id) }),
     };
 
     try {
@@ -385,6 +412,12 @@ export default function CategoriesPage() {
                     <span className="ml-2 badge badge-outline badge-primary">{cat.parent_nom}</span>
                   </div>
                 )}
+                {cat.famille?.nom && (
+                  <div className="mt-2">
+                    <span className="text-xs opacity-70">Familia:</span>
+                    <span className="ml-2 badge badge-outline">{cat.famille.nom}</span>
+                  </div>
+                )}
                 <div className="card-actions justify-end mt-6">
                   <button
                     onClick={(e) => {
@@ -448,17 +481,15 @@ export default function CategoriesPage() {
 
                 <select
                   className="select select-bordered w-full"
-                  value={form.parent}
-                  onChange={(e) => setForm({ ...form, parent: e.target.value })}
+                  value={form.famille_id}
+                  onChange={(e) => setForm({ ...form, famille_id: e.target.value })}
                 >
-                  <option value="">Nenhuma (Categoria Pai)</option>
-                  {allCategories
-                    .filter((c) => c.id !== editing?.id)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nom} {c.parent_nom ? `(sub de ${c.parent_nom})` : ''}
-                      </option>
-                    ))}
+                  <option value="">Selecione a familia</option>
+                  {familles.map((famille) => (
+                    <option key={famille.id} value={famille.id}>
+                      {famille.nom}
+                    </option>
+                  ))}
                 </select>
               </div>
 

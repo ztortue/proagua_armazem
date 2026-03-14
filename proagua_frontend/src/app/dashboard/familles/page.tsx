@@ -9,6 +9,7 @@ type Me = {
 
 type Famille = {
   id: number;
+  code?: string | null;
   nom: string;
   description?: string | null;
 };
@@ -27,6 +28,15 @@ export default function FamillesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ nom: '', description: '' });
+
+  const buildFamilleCode = (value: string) => {
+    const normalized = String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .toUpperCase();
+    return normalized.slice(0, 3).padEnd(3, 'X');
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -63,6 +73,7 @@ export default function FamillesPage() {
     try {
       setSaving(true);
       const payload = {
+        code: buildFamilleCode(nom),
         nom,
         description: form.description.trim() || '',
       };
@@ -87,6 +98,7 @@ export default function FamillesPage() {
     const term = search.trim().toLowerCase();
     if (!term) return familles;
     return familles.filter((f) =>
+      String(f.code || '').toLowerCase().includes(term) ||
       String(f.nom || '').toLowerCase().includes(term) ||
       String(f.description || '').toLowerCase().includes(term)
     );
@@ -131,6 +143,7 @@ export default function FamillesPage() {
         <table className="table table-zebra">
           <thead className="bg-base-300">
             <tr>
+              <th>Codigo</th>
               <th>Nome</th>
               <th>Descrição</th>
             </tr>
@@ -138,6 +151,7 @@ export default function FamillesPage() {
           <tbody>
             {filtered.map((fam) => (
               <tr key={fam.id} className="hover">
+                <td className="font-mono font-semibold">{fam.code || '-'}</td>
                 <td>{fam.nom}</td>
                 <td>{fam.description || '-'}</td>
               </tr>
@@ -161,6 +175,13 @@ export default function FamillesPage() {
                 placeholder="Nome da família"
                 value={form.nom}
                 onChange={(e) => setForm((prev) => ({ ...prev, nom: e.target.value }))}
+              />
+              <input
+                type="text"
+                className="input input-bordered w-full bg-base-200"
+                placeholder="Codigo automatico"
+                value={buildFamilleCode(form.nom)}
+                readOnly
               />
               <textarea
                 className="textarea textarea-bordered w-full"

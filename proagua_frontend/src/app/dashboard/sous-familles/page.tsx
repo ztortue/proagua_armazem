@@ -226,20 +226,20 @@ export default function SousFamillesPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between itemscenter mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-primary">Sous-familles</h1>
+            <h1 className="text-4xl font-bold text-primary">Subcategorias</h1>
             <p className="text-lg opacity-70 mt-2">
               Total: <span className="font-bold">{totalCount}</span> - Pagina <span className="font-bold">{page}</span> / <span className="font-bold">{totalPages}</span>
             </p>
           </div>
           <button className="btn btn-primary" onClick={openCreate}>
-            + Nova sous-famille
+            + Nova subcategoria
           </button>
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <input
             type="text"
-            placeholder="Pesquisar sous-famille..."
+            placeholder="Pesquisar subcategoria..."
             className="input input-bordered w-full max-w-lg"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -289,7 +289,7 @@ export default function SousFamillesPage() {
         </div>
 
         {visibleRows.length === 0 && !loading && (
-          <div className="text-center text-xl text-gray-500 mt-8">Nenhuma sous-famille encontrada</div>
+          <div className="text-center text-xl text-gray-500 mt-8">Nenhuma subcategoria encontrada</div>
         )}
 
         <div className="flex justify-center gap-4 mt-8">
@@ -316,13 +316,13 @@ export default function SousFamillesPage() {
           <div className="modal modal-open">
             <div className="modal-box max-w-lg">
               <h3 className="font-bold text-lg mb-4">
-                {editing ? 'Editar' : 'Nova'} sous-famille
+                {editing ? 'Editar' : 'Nova'} subcategoria
               </h3>
               <div className="space-y-3">
                 <input
                   type="text"
                   className="input input-bordered w-full"
-                  placeholder="Nome da sous-famille"
+                  placeholder="Nome da subcategoria"
                   value={form.nom}
                   onChange={(e) => setForm((prev) => ({ ...prev, nom: e.target.value }))}
                 />

@@ -1,8 +1,0 @@
-Ou gen tout fichye yo deja ki nan projet sa a enplus mwen ajoute urls.py ki anndan projet a nan conversation sa ak views.py ak models.py
-Gen yon fichye excel ki sevi kom envatè nan magazen an mwen mete l pou ou tou.
-
-1. Verifye ke tab kap sevi nan bazdone nou pou materiel konpatib ak fichye sa
-2. Si li pa konpatib esplike kisa nou ta dwe fe pou nou ran sa posib
-3. Si li konpatib konveti information ki nan tab lan nan INSERT INTO instructions pou nou ka mete information yo nan tab la, men nou pa bezwen pran kolonn imagem la en consideration
-
-Objectif nou se surtout mete information yo nan bazdone an men si lap mande pou nou chanje structure lan twop nap chache yon lot methode.

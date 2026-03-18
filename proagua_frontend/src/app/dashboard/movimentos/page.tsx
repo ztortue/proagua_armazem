@@ -15,23 +15,32 @@ function MovimentosContent() {
   const refParam = (searchParams.get('ref') || '').trim().toUpperCase();
   const [me, setMe] = useState<{ role?: string; pilier_affectation?: string } | null>(null);
   const fetchAllPages = async (url: string) => {
-    const collected: any[] = [];
-    let nextUrl: string | null = url;
-    while (nextUrl) {
-      const res: { data: PaginatedResponse<any> | any[] } = await api.get(nextUrl);
-      const data: PaginatedResponse<any> | any[] = res.data;
-      if (Array.isArray(data)) return data;
-      const items = Array.isArray(data?.results) ? data.results : [];
-      collected.push(...items);
-      nextUrl = data?.next || null;
-      if (nextUrl && nextUrl.startsWith('http://localhost:8000/api/')) {
-        nextUrl = nextUrl.replace('http://localhost:8000/api', '');
-      } else if (nextUrl && nextUrl.startsWith('http://127.0.0.1:8000/api/')) {
-        nextUrl = nextUrl.replace('http://127.0.0.1:8000/api', '');
+  const collected: any[] = [];
+  let nextUrl: string | null = url;
+  while (nextUrl) {
+    const res: { data: PaginatedResponse<any> | any[] } = await api.get(nextUrl);
+    const data: PaginatedResponse<any> | any[] = res.data;
+    if (Array.isArray(data)) return data;
+    const items = Array.isArray(data?.results) ? data.results : [];
+    collected.push(...items);
+    const nextRaw: string | null = data?.next || null;
+    if (!nextRaw) {
+      nextUrl = null;
+    } else if (nextRaw.startsWith('http')) {
+      try {
+        const parsed = new URL(nextRaw);
+        nextUrl = parsed.pathname.replace(/^\/api/, '') + parsed.search;
+      } catch {
+        nextUrl = null;
       }
+    } else {
+      nextUrl = nextRaw;
     }
-    return collected;
-  };
+  }
+  return collected;
+};
+    //return collected;
+  //};
 
   const [movimentos, setMovimentos] = useState<any[]>([]);
   const [materiels, setMateriels] = useState<any[]>([]);

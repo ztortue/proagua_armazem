@@ -54,7 +54,7 @@ function ArmazensContent() {
   const [entradaMotivo, setEntradaMotivo] = useState('');
   const [entradaFournisseurId, setEntradaFournisseurId] = useState('');
   const estoquePageSize = 10;
-  const fetchAllPages = async (url: string) => {
+    const fetchAllPages = async (url: string) => {
     const collected: any[] = [];
     let nextUrl: string | null = url;
     while (nextUrl) {
@@ -63,11 +63,19 @@ function ArmazensContent() {
       if (Array.isArray(data)) return data;
       const pageItems = Array.isArray(data?.results) ? data.results : [];
       collected.push(...pageItems);
-      nextUrl = data?.next ?? null;
-      if (nextUrl && nextUrl.startsWith('http://localhost:8000/api/')) {
-        nextUrl = nextUrl.replace('http://localhost:8000/api', '');
-      } else if (nextUrl && nextUrl.startsWith('http://127.0.0.1:8000/api/')) {
-        nextUrl = nextUrl.replace('http://127.0.0.1:8000/api', '');
+      // ✅ FIX : URL absoli → ekstrè path sèlman (menm lojik ki materiais/page.tsx)
+      const nextRaw: string | null = data?.next ?? null;
+      if (!nextRaw) {
+        nextUrl = null;
+      } else if (nextRaw.startsWith('http')) {
+        try {
+          const parsed = new URL(nextRaw);
+          nextUrl = parsed.pathname.replace(/^\/api/, '') + parsed.search;
+        } catch {
+          nextUrl = null;
+        }
+      } else {
+        nextUrl = nextRaw;
       }
     }
     return collected;

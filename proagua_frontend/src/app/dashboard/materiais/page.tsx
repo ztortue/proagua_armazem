@@ -41,7 +41,6 @@ function MateriaisContent() {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toUpperCase();
-  // Never fallback to loc.id here (loc.id is StockEntrepot id, not Entrepot id).
   const getLocEntrepotId = (loc: any): number => Number(loc?.entrepot_id ?? loc?.entrepot_id_value ?? 0);
   const onlyLetters = (value: string) => normalizeText(value).replace(/[^A-Z0-9]/g, '');
   const token3 = (value: string, fallback: string) => {
@@ -187,7 +186,6 @@ function MateriaisContent() {
         setHasAllPilierAccess(allAccess);
 
         if (allAccess) {
-          // For all-pilier profiles, keep full warehouse visibility on materiais page.
           setEffectivePilier(null);
           setPilierResolved(true);
           return;
@@ -332,33 +330,16 @@ function MateriaisContent() {
         selectedSousCategory?.nom || '',
       ].join(' ')
     );
-
-    // Enable DN/PN only for hydraulic-oriented materials.
     return [
-      'HIDRAUL',
-      'TUBO',
-      'TUBUL',
-      'VALV',
-      'FLANGE',
-      'CONEX',
-      'ADUCAO',
-      'DISTRIBU',
-      'DEBIT',
-      'CAUDAL',
-      'MEDIDOR',
-      'MANOMET',
-      'PRESSAO',
+      'HIDRAUL', 'TUBO', 'TUBUL', 'VALV', 'FLANGE', 'CONEX',
+      'ADUCAO', 'DISTRIBU', 'DEBIT', 'CAUDAL', 'MEDIDOR', 'MANOMET', 'PRESSAO',
     ].some((keyword) => tokens.includes(keyword));
   }, [nouveauMateriel.type_materiau, nouveauMateriel.categorie_id, nouveauMateriel.souscategorie_id, categories, sousCategories]);
 
   useEffect(() => {
     if (isHydraulicTypeSelected) return;
     if (!nouveauMateriel.diametre_nominal && !nouveauMateriel.pression_nominal) return;
-    setNouveauMateriel((prev) => ({
-      ...prev,
-      diametre_nominal: '',
-      pression_nominal: '',
-    }));
+    setNouveauMateriel((prev) => ({ ...prev, diametre_nominal: '', pression_nominal: '' }));
   }, [isHydraulicTypeSelected, nouveauMateriel.diametre_nominal, nouveauMateriel.pression_nominal]);
 
   useEffect(() => {
@@ -441,6 +422,7 @@ function MateriaisContent() {
       (m.stock_locations || []).some((loc: any) => getLocEntrepotId(loc) === viewEntrepotId)
     );
   }, [materiais, viewEntrepotId, effectivePilier, entrepots]);
+
   const activeEntrepotName = useMemo(() => {
     if (!viewEntrepotId) return '';
     const found = entrepots.find((ent) => Number(ent.id) === viewEntrepotId);
@@ -471,7 +453,6 @@ function MateriaisContent() {
       }
     });
   };
-
 
   const handleSubmitDemanda = async () => {
     if (!selectedDemandeurReelId) {
@@ -538,13 +519,11 @@ function MateriaisContent() {
     } catch (error: any) {
       const data = error.response?.data;
       let apiError = extractApiError(data) || 'Erro ao enviar requisição';
-
       if (typeof apiError === 'string' && apiError.toLowerCase().includes('deposit')) {
         apiError =
           'Estes materiais não podem ficar no mesmo pedido porque estão em depósitos diferentes. ' +
           'Faça pedidos separados ou selecione materiais do mesmo depósito.';
       }
-
       alert('Erro: ' + apiError);
     }
   };
@@ -559,13 +538,13 @@ function MateriaisContent() {
         (m.stock_locations || []).some((loc: any) => getLocEntrepotId(loc) === viewEntrepotId)
       )
       .filter((m) => {
-      if (selectedIds.has(m.id)) return false;
-      if (!term) return true;
-      return (
-        String(m.code || '').toLowerCase().includes(term) ||
-        String(m.description || '').toLowerCase().includes(term)
-      );
-    });
+        if (selectedIds.has(m.id)) return false;
+        if (!term) return true;
+        return (
+          String(m.code || '').toLowerCase().includes(term) ||
+          String(m.description || '').toLowerCase().includes(term)
+        );
+      });
   }, [addItemPoolDemanda, materiais, viewEntrepotId, selectedItems, addItemSearchDemanda]);
 
   const handleAddItemDemanda = () => {
@@ -578,31 +557,58 @@ function MateriaisContent() {
     setAddItemSearchDemanda('');
   };
 
+  // ============================================================
+  // ✅ handleCreateMaterial — VERSION CORRIGÉE
+  //
+  // FIX #1 : Photo opsyonèl — retire blòk ki te bloke soumisyon
+  // FIX #2 : FormData voye san headers manyèl — kite axios +
+  //           intercepteur api.ts jere Content-Type + boundary
+  // FIX #3 : Erè API afiche pa champ pou dyagnostik pi fasil
+  // ============================================================
   const handleCreateMaterial = async () => {
+    // Validasyon champ obligatwa
     if (!nouveauMateriel.entrepot_principal_id) {
       alert('Selecione o deposito do material.');
       return;
     }
-
-    if (!photoFile) {
-      alert('Adicione uma foto para o material!');
+    if (!nouveauMateriel.description.trim()) {
+      alert('A descrição do material é obrigatória.');
+      return;
+    }
+    if (!nouveauMateriel.categorie_id) {
+      alert('Selecione a categoria do material.');
       return;
     }
 
+    // Konstwi FormData
     const formData = new FormData();
     Object.entries(nouveauMateriel).forEach(([key, value]) => {
-      if (value !== '' && value !== null) {
-        formData.append(key, value);
+      // Voye sèlman valè ki pa vid
+      if (value !== '' && value !== null && value !== undefined) {
+        formData.append(key, String(value));
       }
     });
-    formData.append('photo', photoFile);
+
+    // ✅ FIX #1 — Foto opsyonèl : ajoute sèlman si itilizatè chwazi youn
+    // Anvan: foto te obligatwa epi bloke tout kreye si pa gen foto
+    if (photoFile) {
+      formData.append('photo', photoFile);
+    }
 
     try {
-      await api.post('/materiais/', formData, {
-        headers: { 'Content-Type': undefined },
-      });
+      // ✅ FIX #2 — Pa voye headers manyèlman
+      // Intercepteur nan api.ts detekte FormData epi retire Content-Type
+      // pou kite axios mete bon "multipart/form-data; boundary=..." otomatikman
+      // Anvan: { headers: { 'Content-Type': undefined } } te kase boundary →
+      // Django pa t ka parse champ yo → materyal kreye men vid nan DB
+      await api.post('/materiais/', formData);
 
-      alert('Material + FOTO criado com sucesso!');
+      const successMsg = photoFile
+        ? 'Material criado com sucesso (com foto)!'
+        : 'Material criado com sucesso!';
+      alert(successMsg);
+
+      // Reset fòm lan
       setModalNewOpen(false);
       setPhotoFile(null);
       setNouveauMateriel({
@@ -623,12 +629,29 @@ function MateriaisContent() {
         prix_unitaire: '0',
       });
 
-      // Reload la paj premye a ak tout filtre aktif yo
+      // Rechaje paj la
       setPage(1);
       setRefreshKey((k) => k + 1);
       await loadAllMaterialCodes();
     } catch (error: any) {
-      alert('Erro: ' + (error.response?.data?.detail || JSON.stringify(error.response?.data)));
+      // ✅ FIX #3 — Afiche erè API pa champ pou dyagnostik pi fasil
+      const apiData = error.response?.data;
+      let errMsg = 'Erro ao criar material.';
+      if (typeof apiData === 'string') {
+        errMsg = apiData;
+      } else if (apiData?.detail) {
+        errMsg = apiData.detail;
+      } else if (apiData && typeof apiData === 'object') {
+        const parts = Object.entries(apiData)
+          .map(([field, msgs]) => {
+            const msgStr = Array.isArray(msgs) ? msgs.join(', ') : String(msgs);
+            return `${field}: ${msgStr}`;
+          })
+          .join('\n');
+        errMsg = parts || JSON.stringify(apiData);
+      }
+      alert('Erro:\n' + errMsg);
+      console.error('Erro ao criar material:', apiData || error);
     }
   };
 
@@ -682,14 +705,12 @@ function MateriaisContent() {
       alert('Selecione uma foto.');
       return;
     }
-
     try {
       setUploadingPhoto(true);
       const formData = new FormData();
       formData.append('photo', photoUploadFile);
-      const res = await api.patch(`/materiais/${photoTargetMateriel.id}/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // ✅ Pa voye Content-Type manyèlman — intercepteur api.ts jere sa
+      const res = await api.patch(`/materiais/${photoTargetMateriel.id}/`, formData);
       const updated = res.data;
       setMateriais((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
       if (detailMateriel?.id === updated.id) {
@@ -708,7 +729,7 @@ function MateriaisContent() {
 
   if (loading) {
     return (
-      <div className="flex justify-center itemscenter min-h-screen">
+      <div className="flex justify-center items-center min-h-screen">
         <span className="loading loading-spinner loading-lg text-primary"></span>
       </div>
     );
@@ -716,7 +737,7 @@ function MateriaisContent() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between itemscenter mb-8">
+      <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-bold">Gestão de Materiais</h1>
         <div className="flex gap-4">
           <Link
@@ -738,9 +759,7 @@ function MateriaisContent() {
             + Novo Material
           </button>
           <button
-            onClick={() => {
-              setModalOpen(true);
-            }}
+            onClick={() => setModalOpen(true)}
             className="btn btn-primary btn-lg"
           >
             + Nova Requisição
@@ -749,7 +768,7 @@ function MateriaisContent() {
       </div>
 
       <div className="mb-6">
-        <div className="mb-4 flex flex-wrap itemscenter gap-3">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
             type="text"
             placeholder="Pesquisar por codigo ou descricao..."
@@ -757,7 +776,7 @@ function MateriaisContent() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <div className="flex itemscenter gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5">
+          <div className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5">
             <span className="text-xs font-semibold text-primary">Armazem:</span>
             <select
               className="select select-sm select-bordered min-w-[260px]"
@@ -772,135 +791,57 @@ function MateriaisContent() {
                     : 'Todos'}
               </option>
               {entrepotOptions.map((ent) => (
-                <option key={ent.id} value={ent.id}>
-                  {ent.nom}
-                </option>
+                <option key={ent.id} value={ent.id}>{ent.nom}</option>
               ))}
             </select>
           </div>
         </div>
 
-        <div className="flex flex-wrap itemscenter gap-4">
-          <select
-            className="select select-bordered w-56"
-            value={filterFamille}
-            onChange={(e) => setFilterFamille(e.target.value)}
-          >
+        <div className="flex flex-wrap items-center gap-4">
+          <select className="select select-bordered w-56" value={filterFamille} onChange={(e) => setFilterFamille(e.target.value)}>
             <option value="">Todas famílias</option>
             {famillesOptions.map((fam) => (
-              <option key={fam.id} value={fam.id}>
-                {fam.nom}
-              </option>
+              <option key={fam.id} value={fam.id}>{fam.nom}</option>
             ))}
           </select>
-          <select
-            className="select select-bordered w-64"
-            value={filterCategorie}
-            onChange={(e) => {
-              setFilterCategorie(e.target.value);
-              setFilterSousCategorie('');
-            }}
-          >
+          <select className="select select-bordered w-64" value={filterCategorie} onChange={(e) => { setFilterCategorie(e.target.value); setFilterSousCategorie(''); }}>
             <option value="">Todas categorias</option>
             {categoriesOptions.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.nom}
-              </option>
+              <option key={cat.id} value={cat.id}>{cat.nom}</option>
             ))}
           </select>
-          <select
-            className="select select-bordered w-64"
-            value={filterSousCategorie}
-            onChange={(e) => setFilterSousCategorie(e.target.value)}
-            disabled={!filterCategorie}
-          >
+          <select className="select select-bordered w-64" value={filterSousCategorie} onChange={(e) => setFilterSousCategorie(e.target.value)} disabled={!filterCategorie}>
             <option value="">Todas subcategorias</option>
             {sousCategoriesFilterOptions.map((sc) => (
-              <option key={sc.id} value={sc.id}>
-                {sc.nom}
-              </option>
+              <option key={sc.id} value={sc.id}>{sc.nom}</option>
             ))}
           </select>
-          <select
-            className="select select-bordered w-48"
-            value={filterDiametre}
-            onChange={(e) => setFilterDiametre(e.target.value)}
-          >
+          <select className="select select-bordered w-48" value={filterDiametre} onChange={(e) => setFilterDiametre(e.target.value)}>
             <option value="">Todos diametros</option>
             <option>50</option><option>63</option><option>75</option><option>90</option><option>110</option><option>160</option>
           </select>
-          <select
-            className="select select-bordered w-48"
-            value={filterPN}
-            onChange={(e) => setFilterPN(e.target.value)}
-          >
+          <select className="select select-bordered w-48" value={filterPN} onChange={(e) => setFilterPN(e.target.value)}>
             <option value="">Todas pressoes</option>
             <option>PN6</option><option>PN10</option><option>PN16</option>
           </select>
-          <select
-            className="select select-bordered w-64"
-            value={filterUsage}
-            onChange={(e) => setFilterUsage(e.target.value)}
-          >
+          <select className="select select-bordered w-64" value={filterUsage} onChange={(e) => setFilterUsage(e.target.value)}>
             <option value="">Todos usos</option>
-            {usosTipicos
-              .filter((u) => u.actif !== false)
-              .map((u) => (
-                <option key={u.id} value={u.nom}>
-                  {u.nom}
-                </option>
-              ))}
+            {usosTipicos.filter((u) => u.actif !== false).map((u) => (
+              <option key={u.id} value={u.nom}>{u.nom}</option>
+            ))}
           </select>
           {activeEntrepotName && (
-            <div className="badge badge-primary badge-lg">
-              {`Armazem: ${activeEntrepotName}`}
-            </div>
+            <div className="badge badge-primary badge-lg">{`Armazem: ${activeEntrepotName}`}</div>
           )}
-          <button
-            className="btn btn-outline btn-sm"
-            onClick={() => {
-              setFilterFamille('');
-              setFilterCategorie('');
-              setFilterSousCategorie('');
-              setFilterDiametre('');
-              setFilterPN('');
-              setFilterUsage('');
-            }}
-          >
+          <button className="btn btn-outline btn-sm" onClick={() => { setFilterFamille(''); setFilterCategorie(''); setFilterSousCategorie(''); setFilterDiametre(''); setFilterPN(''); setFilterUsage(''); }}>
             Limpar filtros
           </button>
-          <div className="ml-auto flex itemscenter gap-3">
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => setPage(1)}
-              disabled={page <= 1}
-            >
-              Primeira
-            </button>
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-            >
-              Anterior
-            </button>
-            <span className="text-sm text-gray-500">
-              {`P?gina ${page} / ${totalPages} - Total ${totalCount}`}
-            </span>
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-            >
-              Próxima
-            </button>
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => setPage(totalPages)}
-              disabled={page >= totalPages}
-            >
-              Última
-            </button>
+          <div className="ml-auto flex items-center gap-3">
+            <button className="btn btn-outline btn-sm" onClick={() => setPage(1)} disabled={page <= 1}>Primeira</button>
+            <button className="btn btn-outline btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>Anterior</button>
+            <span className="text-sm text-gray-500">{`Página ${page} / ${totalPages} - Total ${totalCount}`}</span>
+            <button className="btn btn-outline btn-sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Próxima</button>
+            <button className="btn btn-outline btn-sm" onClick={() => setPage(totalPages)} disabled={page >= totalPages}>Última</button>
           </div>
         </div>
       </div>
@@ -956,11 +897,7 @@ function MateriaisContent() {
                   />
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="font-bold text-primary hover:underline"
-                    onClick={() => openDetailModal(m)}
-                  >
+                  <button type="button" className="font-bold text-primary hover:underline" onClick={() => openDetailModal(m)}>
                     {m.code}
                   </button>
                 </td>
@@ -991,7 +928,7 @@ function MateriaisContent() {
                     <button
                       type="button"
                       onClick={() => openPhotoUploadModal(m)}
-                      className="bg-gray-200 border-2 border-dashed rounded-xl w-20 h-20 flex itemscenter justify-center text-xs hover:bg-gray-300 transition-colors"
+                      className="bg-gray-200 border-2 border-dashed rounded-xl w-20 h-20 flex items-center justify-center text-xs hover:bg-gray-300 transition-colors"
                       title="Clique para adicionar foto"
                     >
                       Sem foto
@@ -1009,10 +946,7 @@ function MateriaisContent() {
         <div className="modal modal-open">
           <div className="modal-box max-w-xl">
             <h3 className="font-bold text-xl mb-2">Adicionar foto do material</h3>
-            <p className="text-sm mb-4">
-              {photoTargetMateriel.code} - {photoTargetMateriel.description}
-            </p>
-
+            <p className="text-sm mb-4">{photoTargetMateriel.code} - {photoTargetMateriel.description}</p>
             <div className="space-y-4">
               <input
                 type="file"
@@ -1024,24 +958,11 @@ function MateriaisContent() {
                 <p className="text-sm text-gray-600">Ficheiro selecionado: {photoUploadFile.name}</p>
               )}
             </div>
-
             <div className="modal-action">
-              <button
-                className="btn btn-outline"
-                onClick={() => {
-                  setPhotoUploadModalOpen(false);
-                  setPhotoTargetMateriel(null);
-                  setPhotoUploadFile(null);
-                }}
-                disabled={uploadingPhoto}
-              >
+              <button className="btn btn-outline" onClick={() => { setPhotoUploadModalOpen(false); setPhotoTargetMateriel(null); setPhotoUploadFile(null); }} disabled={uploadingPhoto}>
                 Cancelar
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleUploadMaterialPhoto}
-                disabled={!photoUploadFile || uploadingPhoto}
-              >
+              <button className="btn btn-primary" onClick={handleUploadMaterialPhoto} disabled={!photoUploadFile || uploadingPhoto}>
                 {uploadingPhoto ? 'A guardar...' : 'Guardar foto'}
               </button>
             </div>
@@ -1054,10 +975,13 @@ function MateriaisContent() {
         <div className="modal modal-open">
           <div className="modal-box max-w-4xl">
             <h3 className="font-bold text-3xl mb-6 text-center text-primary">Novo Material</h3>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="col-span-2">
-                <label className="label"><span className="label-text font-bold text-primary">Foto do Material</span></label>
+                <label className="label">
+                  <span className="label-text font-bold text-primary">
+                    Foto do Material <span className="text-gray-400 font-normal">(opcional)</span>
+                  </span>
+                </label>
                 <input
                   type="file"
                   accept="image/*"
@@ -1073,15 +997,13 @@ function MateriaisContent() {
                     }
                   }}
                 />
-                <img id="photo-preview" className="hidden mt-4 max-w-sm max-h-64 rounded-lg shadow-lg object-cover border-4 border-primary" alt='Pre-visualizacao' />
+                <img id="photo-preview" className="hidden mt-4 max-w-sm max-h-64 rounded-lg shadow-lg object-cover border-4 border-primary" alt="Pre-visualizacao" />
               </div>
 
               <div>
                 <label className="label"><span className="label-text font-bold">Codigo (gerado automaticamente)</span></label>
                 <input type="text" placeholder="Gerado automaticamente" className="input input-bordered w-full bg-base-200" value={nouveauMateriel.code} readOnly />
-                <label className="label">
-                  <span className="label-text-alt">Formato: FFF-CCC-KKK-NNNN</span>
-                </label>
+                <label className="label"><span className="label-text-alt">Formato: FFF-CCC-KKK-NNNN</span></label>
               </div>
 
               <div>
@@ -1090,25 +1012,13 @@ function MateriaisContent() {
               </div>
 
               <div>
-                <label className="label"><span className="label-text font-bold">Diametro Nominal (mm) *</span></label>
-                <input
-                  type="number"
-                  placeholder="110"
-                  className="input input-bordered w-full"
-                  value={nouveauMateriel.diametre_nominal}
-                  onChange={(e) => setNouveauMateriel(prev => ({ ...prev, diametre_nominal: e.target.value }))}
-                  disabled={!isHydraulicTypeSelected}
-                />
+                <label className="label"><span className="label-text font-bold">Diametro Nominal (mm)</span></label>
+                <input type="number" placeholder="110" className="input input-bordered w-full" value={nouveauMateriel.diametre_nominal} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, diametre_nominal: e.target.value }))} disabled={!isHydraulicTypeSelected} />
               </div>
 
               <div>
-                <label className="label"><span className="label-text font-bold">Pressao Nominal *</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={nouveauMateriel.pression_nominal}
-                  onChange={(e) => setNouveauMateriel(prev => ({ ...prev, pression_nominal: e.target.value }))}
-                  disabled={!isHydraulicTypeSelected}
-                >
+                <label className="label"><span className="label-text font-bold">Pressao Nominal</span></label>
+                <select className="select select-bordered w-full" value={nouveauMateriel.pression_nominal} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, pression_nominal: e.target.value }))} disabled={!isHydraulicTypeSelected}>
                   <option value="">Selecione</option>
                   <option>PN6</option><option>PN10</option><option>PN16</option><option>PN25</option>
                 </select>
@@ -1119,9 +1029,7 @@ function MateriaisContent() {
                 <select className="select select-bordered w-full" value={nouveauMateriel.type_materiau} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, type_materiau: e.target.value }))}>
                   <option value="">Selecione</option>
                   {famillesOptions.map((fam) => (
-                    <option key={fam.id} value={fam.nom}>
-                      {fam.nom}
-                    </option>
+                    <option key={fam.id} value={fam.nom}>{fam.nom}</option>
                   ))}
                 </select>
               </div>
@@ -1130,13 +1038,9 @@ function MateriaisContent() {
                 <label className="label"><span className="label-text font-bold">Uso Tipico</span></label>
                 <select className="select select-bordered w-full" value={nouveauMateriel.usage_typique} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, usage_typique: e.target.value }))}>
                   <option value="">Selecione</option>
-                  {usosTipicos
-                    .filter((u) => u.actif !== false)
-                    .map((u) => (
-                      <option key={u.id} value={u.nom}>
-                        {u.nom}
-                      </option>
-                    ))}
+                  {usosTipicos.filter((u) => u.actif !== false).map((u) => (
+                    <option key={u.id} value={u.nom}>{u.nom}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1164,17 +1068,7 @@ function MateriaisContent() {
 
               <div>
                 <label className="label"><span className="label-text font-bold">Categoria *</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={nouveauMateriel.categorie_id}
-                  onChange={(e) =>
-                    setNouveauMateriel((prev) => ({
-                      ...prev,
-                      categorie_id: e.target.value,
-                      souscategorie_id: '',
-                    }))
-                  }
-                >
+                <select className="select select-bordered w-full" value={nouveauMateriel.categorie_id} onChange={(e) => setNouveauMateriel((prev) => ({ ...prev, categorie_id: e.target.value, souscategorie_id: '' }))}>
                   <option value="">Selecione</option>
                   {categoriesCreateOptions.map(cat => (
                     <option key={cat.id} value={cat.id}>{cat.nom}</option>
@@ -1184,28 +1078,17 @@ function MateriaisContent() {
 
               <div>
                 <label className="label"><span className="label-text font-bold">Subcategoria (opcional)</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={nouveauMateriel.souscategorie_id}
-                  onChange={(e) => setNouveauMateriel(prev => ({ ...prev, souscategorie_id: e.target.value }))}
-                  disabled={!nouveauMateriel.categorie_id}
-                >
+                <select className="select select-bordered w-full" value={nouveauMateriel.souscategorie_id} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, souscategorie_id: e.target.value }))} disabled={!nouveauMateriel.categorie_id}>
                   <option value="">Sem subcategoria</option>
                   {sousCategoriesCreateOptions.map((sc) => (
-                    <option key={sc.id} value={sc.id}>
-                      {sc.nom}
-                    </option>
+                    <option key={sc.id} value={sc.id}>{sc.nom}</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label className="label"><span className="label-text font-bold">Tipo de Uso *</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={nouveauMateriel.usage_type}
-                  onChange={(e) => setNouveauMateriel(prev => ({ ...prev, usage_type: e.target.value }))}
-                >
+                <select className="select select-bordered w-full" value={nouveauMateriel.usage_type} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, usage_type: e.target.value }))}>
                   <option value="INSTALL">Instalar</option>
                   <option value="PRET">Empréstimo</option>
                 </select>
@@ -1213,12 +1096,7 @@ function MateriaisContent() {
 
               <div>
                 <label className="label"><span className="label-text font-bold">Deposito *</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={nouveauMateriel.entrepot_principal_id}
-                  onChange={(e) => setNouveauMateriel(prev => ({ ...prev, entrepot_principal_id: e.target.value }))}
-                  disabled={!!lockedEntrepotId}
-                >
+                <select className="select select-bordered w-full" value={nouveauMateriel.entrepot_principal_id} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, entrepot_principal_id: e.target.value }))} disabled={!!lockedEntrepotId}>
                   <option value="">Selecione</option>
                   {entrepotOptions.map(ent => (
                     <option key={ent.id} value={ent.id}>{ent.nom}</option>
@@ -1233,10 +1111,13 @@ function MateriaisContent() {
             </div>
 
             <div className="modal-action mt-8">
-              <button onClick={() => { setModalNewOpen(false); setPhotoFile(null); }} className="btn btn-outline">Cancelar</button>
+              <button onClick={() => { setModalNewOpen(false); setPhotoFile(null); }} className="btn btn-outline">
+                Cancelar
+              </button>
+              {/* ✅ FIX #4 — Retire !photoFile — foto pa obligatwa pou aktive bouton */}
               <button
                 onClick={handleCreateMaterial}
-                disabled={!nouveauMateriel.description || !nouveauMateriel.categorie_id || !nouveauMateriel.entrepot_principal_id || !photoFile}
+                disabled={!nouveauMateriel.description || !nouveauMateriel.categorie_id || !nouveauMateriel.entrepot_principal_id}
                 className="btn btn-success btn-lg px-10"
               >
                 Criar Material
@@ -1267,69 +1148,47 @@ function MateriaisContent() {
                     value={addItemSearchDemanda}
                     onChange={(e) => setAddItemSearchDemanda(e.target.value)}
                   />
-                  <select
-                    className="select select-bordered w-full"
-                    value={addItemIdDemanda}
-                    onChange={(e) => setAddItemIdDemanda(e.target.value)}
-                  >
+                  <select className="select select-bordered w-full" value={addItemIdDemanda} onChange={(e) => setAddItemIdDemanda(e.target.value)}>
                     <option value="">Selecione o material</option>
                     {addCandidatesDemanda.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.code} - {m.description}
-                      </option>
+                      <option key={m.id} value={m.id}>{m.code} - {m.description}</option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={handleAddItemDemanda}
-                    disabled={!addItemIdDemanda}
-                  >
+                  <button type="button" className="btn btn-outline" onClick={handleAddItemDemanda} disabled={!addItemIdDemanda}>
                     + Adicionar
                   </button>
                 </div>
               </div>
 
               {selectedItems.map(item => (
-                <div key={item.id} className="flex itemscenter gap-4 p-4 border-2 border-base-300 rounded-xl hover:border-primary transition-all">
+                <div key={item.id} className="flex items-center gap-4 p-4 border-2 border-base-300 rounded-xl hover:border-primary transition-all">
                   <div className="flex-1">
                     <p className="font-bold text-lg">{item.code}</p>
                     <p className="text-sm opacity-80">{item.description}</p>
                     <p className="text-xs opacity-60">{`Stock atual: ${item.stock_actuel} | Min: ${item.stock_min}`}</p>
                   </div>
-                  <div className="flex itemscenter gap-3">
+                  <div className="flex items-center gap-3">
                     <input
                       type="number"
                       min="1"
                       value={quantiteDemande[item.id] || 1}
-                      onChange={(e) => setQuantiteDemande(prev => ({
-                        ...prev,
-                        [item.id]: Math.max(1, parseInt(e.target.value) || 1)
-                      }))}
+                      onChange={(e) => setQuantiteDemande(prev => ({ ...prev, [item.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
                       className="input input-bordered w-28 text-center font-bold"
                     />
                     <select
                       className="select select-bordered w-56"
                       value={selectedEntrepotDemanda[item.id] || ''}
-                      onChange={(e) =>
-                        setSelectedEntrepotDemanda((prev) => ({
-                          ...prev,
-                          [item.id]: e.target.value,
-                        }))
-                      }
+                      onChange={(e) => setSelectedEntrepotDemanda((prev) => ({ ...prev, [item.id]: e.target.value }))}
                       disabled={!!lockedEntrepotId}
                     >
                       <option value="">Selecione o deposito</option>
                       {(item.stock_locations || [])
                         .filter((loc: any) => !viewEntrepotId || getLocEntrepotId(loc) === viewEntrepotId)
                         .map((loc: any) => (
-                        <option
-                          key={getLocEntrepotId(loc)}
-                          value={getLocEntrepotId(loc)}
-                        >
-                          {loc.entrepot} {`(Qtd: ${loc.quantite || 0})`}
-                        </option>
-                      ))}
+                          <option key={getLocEntrepotId(loc)} value={getLocEntrepotId(loc)}>
+                            {loc.entrepot} {`(Qtd: ${loc.quantite || 0})`}
+                          </option>
+                        ))}
                     </select>
                     <button onClick={() => toggleItem(item)} className="btn btn-circle btn-error btn-sm">×</button>
                   </div>
@@ -1339,18 +1198,14 @@ function MateriaisContent() {
 
             <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text font-semibold">Tipo de movimento</span>
-                </label>
+                <label className="label"><span className="label-text font-semibold">Tipo de movimento</span></label>
                 <select
                   className="select select-bordered w-full"
                   value={selectedTipoFluxoDemanda}
                   onChange={(e) => {
                     const next = e.target.value as any;
                     setSelectedTipoFluxoDemanda(next);
-                    if (next !== 'TRANSFERENCIA') {
-                      setSelectedTransferDestinoDemandaId('');
-                    }
+                    if (next !== 'TRANSFERENCIA') setSelectedTransferDestinoDemandaId('');
                   }}
                 >
                   <option value="INSTALACAO">Saida (Instalação)</option>
@@ -1362,59 +1217,34 @@ function MateriaisContent() {
               </div>
               {selectedTipoFluxoDemanda === 'TRANSFERENCIA' && (
                 <div className="form-control w-full">
-                  <label className="label">
-                    <span className="label-text font-semibold">Deposito de destino</span>
-                  </label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={selectedTransferDestinoDemandaId}
-                    onChange={(e) => setSelectedTransferDestinoDemandaId(e.target.value)}
-                  >
+                  <label className="label"><span className="label-text font-semibold">Deposito de destino</span></label>
+                  <select className="select select-bordered w-full" value={selectedTransferDestinoDemandaId} onChange={(e) => setSelectedTransferDestinoDemandaId(e.target.value)}>
                     <option value="">Selecione o deposito de destino</option>
                     {entrepots
                       .filter((ent) => !Object.values(selectedEntrepotDemanda).some((origemId) => Number(origemId) === Number(ent.id)))
                       .map((ent) => (
-                      <option key={ent.id} value={ent.id}>
-                        {ent.nom}
-                      </option>
-                    ))}
+                        <option key={ent.id} value={ent.id}>{ent.nom}</option>
+                      ))}
                   </select>
                 </div>
               )}
               {selectedTipoFluxoDemanda === 'EMPRESTIMO' && (
                 <div className="form-control w-full">
-                  <label className="label">
-                    <span className="label-text font-semibold">Data/hora prevista de retorno</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="input input-bordered w-full"
-                    value={dataRetornoPrevistaDemanda}
-                    onChange={(e) => setDataRetornoPrevistaDemanda(e.target.value)}
-                  />
+                  <label className="label"><span className="label-text font-semibold">Data/hora prevista de retorno</span></label>
+                  <input type="datetime-local" className="input input-bordered w-full" value={dataRetornoPrevistaDemanda} onChange={(e) => setDataRetornoPrevistaDemanda(e.target.value)} />
                 </div>
               )}
               <div className="form-control w-full">
-                <label className="label">
-                  <span className="label-text font-semibold">Empresa demandante</span>
-                </label>
-                <select
-                  className="select select-bordered w-full"
-                  value={selectedDemandeurReelId}
-                  onChange={(e) => setSelectedDemandeurReelId(e.target.value)}
-                >
+                <label className="label"><span className="label-text font-semibold">Empresa demandante</span></label>
+                <select className="select select-bordered w-full" value={selectedDemandeurReelId} onChange={(e) => setSelectedDemandeurReelId(e.target.value)}>
                   <option value="">Selecione</option>
                   {utilisateursFinal.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.entreprise}
-                    </option>
+                    <option key={u.id} value={u.id}>{u.entreprise}</option>
                   ))}
                 </select>
               </div>
               <div className="form-control w-full md:col-span-2">
-                <label className="label">
-                  <span className="label-text font-semibold">Justificativa / Observacao</span>
-                </label>
+                <label className="label"><span className="label-text font-semibold">Justificativa / Observacao</span></label>
                 <textarea
                   className="textarea textarea-bordered w-full"
                   rows={3}
@@ -1423,25 +1253,14 @@ function MateriaisContent() {
                   onChange={(e) => setDescricaoDemanda(e.target.value)}
                 />
               </div>
-              <div className="flex itemscenter justify-end gap-3 md:col-span-2">
+              <div className="flex items-center justify-end gap-3 md:col-span-2">
                 <button
-                  onClick={() => {
-                    setModalOpen(false);
-                    setAddItemSearchDemanda('');
-                    setAddItemIdDemanda('');
-                    setDescricaoDemanda('');
-                    setSelectedTransferDestinoDemandaId('');
-                    setDataRetornoPrevistaDemanda('');
-                  }}
+                  onClick={() => { setModalOpen(false); setAddItemSearchDemanda(''); setAddItemIdDemanda(''); setDescricaoDemanda(''); setSelectedTransferDestinoDemandaId(''); setDataRetornoPrevistaDemanda(''); }}
                   className="btn btn-outline"
                 >
                   Cancelar
                 </button>
-                <button
-                  onClick={handleSubmitDemanda}
-                  disabled={selectedItems.length === 0}
-                  className="btn btn-success btn-lg px-8"
-                >
+                <button onClick={handleSubmitDemanda} disabled={selectedItems.length === 0} className="btn btn-success btn-lg px-8">
                   Enviar Requisição ({selectedItems.length})
                 </button>
               </div>
@@ -1464,7 +1283,6 @@ function MateriaisContent() {
                 detailMateriel.updated_at ? new Date(detailMateriel.updated_at).toLocaleString('pt-BR') : '-'
               }`}
             </p>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
               <div className="bg-base-200 rounded-lg p-3">
                 <div className="text-xs opacity-70">Stock atual</div>
@@ -1475,19 +1293,10 @@ function MateriaisContent() {
                 <div className="text-xl font-bold">{(detailMateriel.stock_locations || []).length}</div>
               </div>
             </div>
-
             <div className="mb-4">
-              <label className="label">
-                <span className="label-text font-semibold">Descricao</span>
-              </label>
-              <textarea
-                className="textarea textarea-bordered w-full"
-                rows={3}
-                value={detailDescription}
-                onChange={(e) => setDetailDescription(e.target.value)}
-              />
+              <label className="label"><span className="label-text font-semibold">Descricao</span></label>
+              <textarea className="textarea textarea-bordered w-full" rows={3} value={detailDescription} onChange={(e) => setDetailDescription(e.target.value)} />
             </div>
-
             <div className="mb-6">
               <div className="font-semibold mb-2">Depositos e quantidades</div>
               <div className="rounded-lg border border-base-300 max-h-52 overflow-y-auto">
@@ -1505,14 +1314,9 @@ function MateriaisContent() {
                 )}
               </div>
             </div>
-
             <div className="modal-action">
-              <button className="btn btn-outline" onClick={() => setDetailModalOpen(false)}>
-                Fechar
-              </button>
-              <button className="btn btn-primary" onClick={handleDemandFromDetail}>
-                Fazer Requisição
-              </button>
+              <button className="btn btn-outline" onClick={() => setDetailModalOpen(false)}>Fechar</button>
+              <button className="btn btn-primary" onClick={handleDemandFromDetail}>Fazer Requisição</button>
               <button className="btn btn-success" onClick={handleSaveDetail} disabled={savingDetail}>
                 {savingDetail ? 'Salvando...' : 'Salvar descricao'}
               </button>

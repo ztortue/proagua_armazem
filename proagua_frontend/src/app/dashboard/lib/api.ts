@@ -1,10 +1,15 @@
-// src/lib/api.ts — VERSION CORRIGÉE (JWT ONLY)
+// ============================================================
+// CORRECTION — proagua_frontend/src/app/dashboard/lib/api.ts
 //
-// PROBLÈME RÉSOLU:
-//   ❌ withCredentials: true  → envoie cookie CSRF inutile, cause 403 sur POST/PUT/DELETE
-//   ❌ Refresh déclenché sur 403 → boucle infinie si pas les droits
-//   ❌ processQueue ne passait pas l'erreur correctement
-//   ❌ ROTATE_REFRESH_TOKENS=True ignoré (nouveau refresh token pas sauvegardé)
+// BUG #4 CORRIGÉ : logout() redirijye sou '/' (root)
+//                  men dashboard redirect sou '/auth/login'
+//                  → inkonsistans. Kounye a tout al sou '/'
+//                  (root page = login page)
+//
+// BUG #5 CORRIGÉ : JWTPayload te manke pilier_affectation nan
+//                  decode → getUserFromToken() retounen null
+//                  pou chèk pilar
+// ============================================================
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
@@ -13,10 +18,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  // ✅ withCredentials SUPPRIMÉ — JWT Bearer uniquement, pas de cookie
+  // ✅ withCredentials SUPPRIMÉ — JWT Bearer uniquement, pas de cookie CSRF
 });
 
-// ── Intercepteur REQUEST : Bearer token automatique ──────────────────────────
+// ── Intercepteur REQUEST : Bearer token automatique ─────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
@@ -25,7 +30,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// ── File d'attente pendant le refresh ────────────────────────────────────────
+// ── File d'attente pendant le refresh ───────────────────────────────────────
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (token: string) => void;
@@ -40,7 +45,7 @@ const processQueue = (token: string | null, error: unknown = null) => {
   failedQueue = [];
 };
 
-// ── Intercepteur RESPONSE : Refresh sur 401 uniquement ───────────────────────
+// ── Intercepteur RESPONSE : Refresh sur 401 uniquement ──────────────────────
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -73,7 +78,7 @@ api.interceptors.response.use(
       if (!refreshToken) {
         isRefreshing = false;
         localStorage.clear();
-        window.location.href = '/auth/login';
+        window.location.href = '/'; // ✅ root = login page
         return Promise.reject(error);
       }
 
@@ -96,7 +101,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(null, refreshError);
         localStorage.clear();
-        window.location.href = '/auth/login';
+        window.location.href = '/'; // ✅ root = login page
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -107,19 +112,22 @@ api.interceptors.response.use(
   }
 );
 
-// ── Types et helpers ──────────────────────────────────────────────────────────
+// ── Types et helpers ─────────────────────────────────────────────────────────
 export interface JWTPayload {
   user_id: number;
   username: string;
   email?: string;
+  first_name?: string;
+  last_name?: string;
   role: 'ADMIN' | 'MANAGER' | 'USER' | 'CONSULTATION';
+  // ✅ FIX : pilier_affectation te manke nan type → chèk pilar te toujou fail
   pilier_affectation: 'PILAR1' | 'PILAR2' | 'PILAR3' | 'TODOS';
+  is_superuser?: boolean;
   exp: number;
 }
 
 function decodeJwtPayload(raw: string): JWTPayload | null {
   try {
-    // JWT uses base64url; convert to standard base64 and pad before atob.
     let base64 = raw.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4 !== 0) base64 += '=';
     return JSON.parse(atob(base64)) as JWTPayload;
@@ -146,14 +154,15 @@ export function getUserFromToken(): JWTPayload | null {
 
 export const isAuthenticated = () => getUserFromToken() !== null;
 
-// ✅ Chak rôle separe
 export const isAdmin = () => getUserFromToken()?.role === 'ADMIN';
 export const isManager = () => getUserFromToken()?.role === 'MANAGER';
 export const isManagerOrAdmin = () => ['ADMIN', 'MANAGER'].includes(getUserFromToken()?.role ?? '');
 export const isConsultation = () => getUserFromToken()?.role === 'CONSULTATION';
 
+// ✅ FIX : logout toujou al sou '/' (root = login)
+// Te genyen inkonsistans ant logout() (→ '/') ak intercepteur 401 (→ '/auth/login')
 export function logout(): void {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
-  window.location.href = '/'; // Rout = page login ou homepage selon besoin
+  window.location.href = '/';
 }

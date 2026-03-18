@@ -19,6 +19,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['role'] = user.role
         token['is_superuser'] = user.is_superuser
         token['username'] = user.username
+        token['pilier_affectation'] = user.pilier_affectation
+        token['email'] = user.email or ''
+        token['first_name'] = user.first_name or ''
+        token['last_name'] = user.last_name or ''
         return token
 
 

@@ -29,8 +29,8 @@ function MateriaisContent() {
   const pilierParam = searchParams.get('pilier');
   const entrepotParam = searchParams.get('entrepot');
   const lockedEntrepotId = entrepotParam ? Number(entrepotParam) : null;
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
-  const mediaBaseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+  const mediaBaseUrl = apiBaseUrl.startsWith('http') ? apiBaseUrl.replace(/\/api\/?$/, '') : '';
   const resolvePhotoUrl = (url: string) => {
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
@@ -53,10 +53,14 @@ function MateriaisContent() {
   const mapCategorieCode = (categorieNom: string) => token3(categorieNom, 'CAT');
   const mapSousCategorieCode = (sousCategorieNom: string) => token3(sousCategorieNom, 'SUB');
   const [allMaterialCodes, setAllMaterialCodes] = useState<string[]>([]);
-  const toRelativeApiPath = (nextUrl: string) =>
-    nextUrl
-      .replace('http://localhost:8000/api', '')
-      .replace('http://127.0.0.1:8000/api', '');
+  const toRelativeApiPath = (nextUrl: string) => {
+    try {
+      const url = new URL(nextUrl);
+      return url.pathname + url.search;
+    } catch {
+      return nextUrl;
+    }
+  };
   const fetchAllPages = async (url: string) => {
     const collected: any[] = [];
     let nextPath: string | null = url;

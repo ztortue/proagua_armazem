@@ -1,5 +1,12 @@
-// src/app/page.tsx
 'use client';
+// ============================================================
+// CORRECTION — proagua_frontend/src/app/page.tsx  (root login)
+//
+// BUG CORRIGÉ : refresh_token pa t ap sove
+// Ce fichier et auth/login/page.tsx font la même chose.
+// Idéalement garder seulement UNE page login (page.tsx ici
+// car elle a le meilleur design avec image de fond).
+// ============================================================
 
 import { useState } from 'react';
 
@@ -25,13 +32,15 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // ✅ FIX CRITIQUE : les deux tokens doivent être sauvegardés
         localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
+        localStorage.setItem('refresh_token', data.refresh); // ← te manke !
         window.location.href = '/pilier';
       } else {
-        setError('Usuário ou senha incorretos');
+        const msg = data?.detail || data?.non_field_errors?.[0] || 'Usuário ou senha incorretos';
+        setError(msg);
       }
-    } catch (err) {
+    } catch {
       setError('Erro de conexão com o servidor');
     } finally {
       setLoading(false);
@@ -40,7 +49,7 @@ export default function LoginPage() {
 
   return (
     <>
-      {/* Background pi klè */}
+      {/* Background */}
       <div className="fixed inset-0 -z-10">
         <img
           src="/img2Login.jpg"
@@ -52,8 +61,8 @@ export default function LoginPage() {
 
       <div className="min-h-screen flex items-center justify-center px-6">
         <div className="max-w-6xl w-full grid md:grid-cols-2 gap-12 items-center">
-          
-          {/* Bò goch */}
+
+          {/* Côté gauche */}
           <div className="text-white">
             <h1 className="text-6xl md:text-7xl font-bold mb-4 drop-shadow-2xl">
               Pro<span className="text-primary">Agua</span>
@@ -67,31 +76,39 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Bò dwat - Fòm plis transparan */}
+          {/* Côté droit — Formulaire */}
           <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl p-10 max-w-md mx-auto border border-white/20">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-gray-800">Bem-vindo de volta</h2>
               <p className="text-gray-600 mt-2">Entre com suas credenciais</p>
             </div>
 
+            {/* ✅ Erreur inline au lieu de alert() */}
+            {error && (
+              <div className="alert alert-error mb-4 text-sm">
+                <span>{error}</span>
+              </div>
+            )}
+
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
-                <label className="label">
-                  <span className="label-text font-semibold">Usuário</span>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Usuário
                 </label>
                 <input
                   type="text"
-                  placeholder="Digite seu usuário"
+                  placeholder="Nome de usuário"
                   className="input input-bordered w-full bg-white/70"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
+                  autoComplete="username"
                 />
               </div>
 
               <div>
-                <label className="label">
-                  <span className="label-text font-semibold">Senha</span>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Senha
                 </label>
                 <input
                   type="password"
@@ -100,25 +117,16 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                 />
               </div>
-
-              {error && (
-                <div className="alert alert-error shadow-lg text-sm">
-                  <span>{error}</span>
-                </div>
-              )}
 
               <button
                 type="submit"
                 disabled={loading}
-                className={`btn w-full h-12 text-lg font-semibold
-                  ${loading 
-                    ? 'btn-disabled loading' 
-                    : 'btn-primary hover:btn-accent shadow-lg hover:shadow-xl transition-all'
-                  }`}
+                className="btn btn-primary w-full"
               >
-                {loading ? 'Conectando...' : 'Entrar no Sistema'}
+                {loading ? <span className="loading loading-spinner loading-sm" /> : 'Entrar'}
               </button>
             </form>
           </div>

@@ -49,8 +49,10 @@ logs*.txt
 Thumbs.db
 
 # Local runtime artifacts
+scripts/
 media/
 staticfiles/
 img/
 backups/
 *.docx
+*.sql

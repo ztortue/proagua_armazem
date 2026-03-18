@@ -781,7 +781,7 @@ function MateriaisContent() {
             value={filterFamille}
             onChange={(e) => setFilterFamille(e.target.value)}
           >
-            <option value="">Todas fam?lias</option>
+            <option value="">Todas famílias</option>
             {famillesOptions.map((fam) => (
               <option key={fam.id} value={fam.id}>
                 {fam.nom}

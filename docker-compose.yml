@@ -4,9 +4,9 @@ services:
     container_name: proagua_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: proagua_armazem
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: p3m4cL!nuxGNU
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -36,9 +36,9 @@ services:
       - ./proagua_backend/.env
     environment:
       DEBUG: "False"
-      POSTGRES_DB: proagua_armazem
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: p3m4cL!nuxGNU
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -65,9 +65,9 @@ services:
       - ./proagua_backend/.env
     environment:
       DEBUG: "False"
-      POSTGRES_DB: proagua_armazem
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: p3m4cL!nuxGNU
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -94,9 +94,9 @@ services:
       - ./proagua_backend/.env
     environment:
       DEBUG: "False"
-      POSTGRES_DB: proagua_armazem
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: p3m4cL!nuxGNU
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -145,13 +145,13 @@ services:
     depends_on:
       - db
     environment:
-      PGPASSWORD: p3m4cL!nuxGNU
+      PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./backups:/backups
     entrypoint: >
       sh -c "
       while true; do
-        pg_dump -h db -U postgres -d proagua_armazem > /backups/proagua_$$(date +%Y%m%d_%H%M%S).sql;
+        pg_dump -h db -U ${POSTGRES_USER} -d ${POSTGRES_DB} > /backups/proagua_$$(date +%Y%m%d_%H%M%S).sql;
         find /backups -type f -name '*.sql' -mtime +7 -delete;
         sleep 86400;
       done

@@ -146,7 +146,7 @@ export default function DashboardContent() {
           api.get('/entrepots/'),
           api.get('/users/'),
           api.get('/projets/'),
-          api.get('/pedidosrecebimento-pendente-summary/'),
+          api.get('/pedidos/recebimento-pendente-summary/'),
           api.get('/notifications/?unread=1&type=RECEBIMENTO_PENDENTE'),
         ]);
 

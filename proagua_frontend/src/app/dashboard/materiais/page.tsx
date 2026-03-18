@@ -90,6 +90,7 @@ function MateriaisContent() {
   const [materiais, setMateriais] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -262,7 +263,7 @@ function MateriaisContent() {
       }
     }
     load();
-  }, [search, filterFamille, filterCategorie, filterSousCategorie, filterDiametre, filterPN, filterUsage, page, effectivePilier, pilierResolved, viewEntrepotId]);
+  }, [search, filterFamille, filterCategorie, filterSousCategorie, filterDiametre, filterPN, filterUsage, page, effectivePilier, pilierResolved, viewEntrepotId, refreshKey]);
 
   useEffect(() => {
     if (!modalOpen || !pilierResolved) return;
@@ -594,7 +595,7 @@ function MateriaisContent() {
 
     try {
       await api.post('/materiais/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': undefined },
       });
 
       alert('Material + FOTO criado com sucesso!');
@@ -618,9 +619,9 @@ function MateriaisContent() {
         prix_unitaire: '0',
       });
 
-      // Refresh
-      const res = await api.get('/materiais/');
-      setMateriais(Array.isArray(res.data) ? res.data : res.data.results || []);
+      // Reload la paj premye a ak tout filtre aktif yo
+      setPage(1);
+      setRefreshKey((k) => k + 1);
       await loadAllMaterialCodes();
     } catch (error: any) {
       alert('Erro: ' + (error.response?.data?.detail || JSON.stringify(error.response?.data)));

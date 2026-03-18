@@ -109,7 +109,6 @@ class StockEntrepotSerializer(serializers.ModelSerializer):
     materiel_description = serializers.CharField(source='materiel.description', read_only=True)
     materiel_usage_type = serializers.CharField(source='materiel.usage_type', read_only=True)
     entrepot = serializers.StringRelatedField()
-    entrepot_id = serializers.IntegerField(source='entrepot.id', read_only=True)
     entrepot_id_value = serializers.IntegerField(source='entrepot.id', read_only=True)
     emplacement = EmplacementSerializer(read_only=True)
     entrepot_id = serializers.PrimaryKeyRelatedField(

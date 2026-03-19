@@ -1,6 +1,7 @@
 # VCS
 .git
 .gitignore
+.claude/
 
 # Env / secrets
 .env

@@ -148,6 +148,7 @@ function MateriaisContent() {
   const [filterCategorie, setFilterCategorie] = useState('');
   const [filterSousCategorie, setFilterSousCategorie] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [selectedFamilleId, setSelectedFamilleId] = useState('');
   const [selectedViewEntrepotId, setSelectedViewEntrepotId] = useState('');
   const [effectivePilier, setEffectivePilier] = useState<'PILAR1' | 'PILAR2' | 'PILAR3' | null>(null);
   const [hasAllPilierAccess, setHasAllPilierAccess] = useState(false);
@@ -323,9 +324,11 @@ function MateriaisContent() {
   const isHydraulicTypeSelected = useMemo(() => {
     const selectedCategory = categories.find((cat: any) => String(cat.id) === String(nouveauMateriel.categorie_id));
     const selectedSousCategory = sousCategories.find((sc: any) => String(sc.id) === String(nouveauMateriel.souscategorie_id));
+    const selectedFamilleNom =
+      categories.find((cat: any) => String(cat?.famille?.id || '') === selectedFamilleId)?.famille?.nom || '';
     const tokens = normalizeText(
       [
-        nouveauMateriel.type_materiau,
+        selectedFamilleNom,
         selectedCategory?.nom || '',
         selectedSousCategory?.nom || '',
       ].join(' ')
@@ -334,7 +337,7 @@ function MateriaisContent() {
       'HIDRAUL', 'TUBO', 'TUBUL', 'VALV', 'FLANGE', 'CONEX',
       'ADUCAO', 'DISTRIBU', 'DEBIT', 'CAUDAL', 'MEDIDOR', 'MANOMET', 'PRESSAO',
     ].some((keyword) => tokens.includes(keyword));
-  }, [nouveauMateriel.type_materiau, nouveauMateriel.categorie_id, nouveauMateriel.souscategorie_id, categories, sousCategories]);
+  }, [selectedFamilleId, nouveauMateriel.categorie_id, nouveauMateriel.souscategorie_id, categories, sousCategories]);
 
   useEffect(() => {
     if (isHydraulicTypeSelected) return;
@@ -380,12 +383,11 @@ function MateriaisContent() {
   }, [sousCategories, nouveauMateriel.categorie_id]);
 
   const categoriesCreateOptions = useMemo(() => {
-    if (!nouveauMateriel.type_materiau) return categories;
-    const selectedFamily = normalizeText(nouveauMateriel.type_materiau);
+    if (!selectedFamilleId) return categories;
     return categories
-      .filter((cat: any) => normalizeText(cat?.famille?.nom || '') === selectedFamily)
+      .filter((cat: any) => String(cat?.famille?.id || '') === selectedFamilleId)
       .sort((a: any, b: any) => String(a?.nom || '').localeCompare(String(b?.nom || '')));
-  }, [categories, nouveauMateriel.type_materiau]);
+  }, [categories, selectedFamilleId]);
 
   useEffect(() => {
     if (!filterCategorie) return;
@@ -398,16 +400,6 @@ function MateriaisContent() {
     const stillValid = sousCategoriesFilterOptions.some((sc) => sc.id === filterSousCategorie);
     if (!stillValid) setFilterSousCategorie('');
   }, [filterCategorie, filterSousCategorie, sousCategoriesFilterOptions]);
-
-  useEffect(() => {
-    if (!nouveauMateriel.categorie_id) return;
-    const stillValid = categoriesCreateOptions.some(
-      (cat: any) => String(cat.id) === String(nouveauMateriel.categorie_id)
-    );
-    if (!stillValid) {
-      setNouveauMateriel((prev) => ({ ...prev, categorie_id: '', souscategorie_id: '' }));
-    }
-  }, [categoriesCreateOptions, nouveauMateriel.categorie_id]);
 
   const materiaisView = useMemo(() => {
     const byPilier = effectivePilier
@@ -580,28 +572,47 @@ function MateriaisContent() {
       return;
     }
 
-    // Konstwi FormData
-    const formData = new FormData();
-    Object.entries(nouveauMateriel).forEach(([key, value]) => {
-      // Voye sèlman valè ki pa vid
-      if (value !== '' && value !== null && value !== undefined) {
-        formData.append(key, String(value));
-      }
-    });
+    const selectedFamille = famillesOptions.find((fam) => fam.id === selectedFamilleId);
+    const payload: Record<string, string | number> = {
+      description: nouveauMateriel.description.trim(),
+      categorie_id: Number(nouveauMateriel.categorie_id),
+      entrepot_principal_id: Number(nouveauMateriel.entrepot_principal_id),
+      unite: nouveauMateriel.unite,
+      usage_type: nouveauMateriel.usage_type,
+      stock_min: Number(nouveauMateriel.stock_min || 0),
+      prix_unitaire: Number(nouveauMateriel.prix_unitaire || 0),
+    };
 
-    // ✅ FIX #1 — Foto opsyonèl : ajoute sèlman si itilizatè chwazi youn
-    // Anvan: foto te obligatwa epi bloke tout kreye si pa gen foto
-    if (photoFile) {
-      formData.append('photo', photoFile);
+    if (nouveauMateriel.souscategorie_id) {
+      payload.souscategorie_id = Number(nouveauMateriel.souscategorie_id);
+    }
+    if (nouveauMateriel.stock_max !== '') {
+      payload.stock_max = Number(nouveauMateriel.stock_max);
+    }
+    if (nouveauMateriel.diametre_nominal !== '') {
+      payload.diametre_nominal = Number(nouveauMateriel.diametre_nominal);
+    }
+    if (nouveauMateriel.pression_nominal) {
+      payload.pression_nominal = nouveauMateriel.pression_nominal;
+    }
+    if (nouveauMateriel.usage_typique) {
+      payload.usage_typique = nouveauMateriel.usage_typique;
+    }
+    if (selectedFamille?.nom) {
+      payload.type_materiau = selectedFamille.nom;
     }
 
     try {
-      // ✅ FIX #2 — Pa voye headers manyèlman
-      // Intercepteur nan api.ts detekte FormData epi retire Content-Type
-      // pou kite axios mete bon "multipart/form-data; boundary=..." otomatikman
-      // Anvan: { headers: { 'Content-Type': undefined } } te kase boundary →
-      // Django pa t ka parse champ yo → materyal kreye men vid nan DB
-      await api.post('/materiais/', formData);
+      if (photoFile) {
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          formData.append(key, String(value));
+        });
+        formData.append('photo', photoFile);
+        await api.post('/materiais/', formData);
+      } else {
+        await api.post('/materiais/', payload);
+      }
 
       const successMsg = photoFile
         ? 'Material criado com sucesso (com foto)!'
@@ -611,6 +622,7 @@ function MateriaisContent() {
       // Reset fòm lan
       setModalNewOpen(false);
       setPhotoFile(null);
+      setSelectedFamilleId('');
       setNouveauMateriel({
         code: '',
         description: '',
@@ -1025,11 +1037,23 @@ function MateriaisContent() {
               </div>
 
               <div>
-                <label className="label"><span className="label-text font-bold">Tipo de Material (Familia) *</span></label>
-                <select className="select select-bordered w-full" value={nouveauMateriel.type_materiau} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, type_materiau: e.target.value }))}>
+                <label className="label"><span className="label-text font-bold">Familia</span></label>
+                <select
+                  className="select select-bordered w-full"
+                  value={selectedFamilleId}
+                  onChange={(e) => {
+                    const nextFamilleId = e.target.value;
+                    setSelectedFamilleId(nextFamilleId);
+                    setNouveauMateriel((prev) => ({
+                      ...prev,
+                      categorie_id: '',
+                      souscategorie_id: '',
+                    }));
+                  }}
+                >
                   <option value="">Selecione</option>
                   {famillesOptions.map((fam) => (
-                    <option key={fam.id} value={fam.nom}>{fam.nom}</option>
+                    <option key={fam.id} value={fam.id}>{fam.nom}</option>
                   ))}
                 </select>
               </div>

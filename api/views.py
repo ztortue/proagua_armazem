@@ -166,16 +166,16 @@ class MaterielViewSet(viewsets.ModelViewSet):
                     entrepot=entrepot_default,
                     quantite=0
                 )
-                print(f"Stock initial cree pour {materiel.code} dans {entrepot_default.nom}")
 
-            _audit_log(
-                self.request.user,
-                'CREATE',
-                'MATERIAIS',
-                obj=materiel,
-                changes='Criacao de material.',
-            )
-            return materiel
+        # Audit log deyò blok atomic — si li echwe li pa dwe woule tranzaksyon prensipal la
+        _audit_log(
+            self.request.user,
+            'CREATE',
+            'MATERIAIS',
+            obj=materiel,
+            changes='Criacao de material.',
+        )
+        return materiel
 
     def perform_update(self, serializer):
         materiel = serializer.save(updated_by=self.request.user)
@@ -356,13 +356,14 @@ class MouvementViewSet(viewsets.ModelViewSet):
             if mvt.type_mvt == "TRANSFERT" and entrepot_destino_id:
                 cache.delete(f"stock_entrepot_{entrepot_destino_id}")
 
-            _audit_log(
-                self.request.user,
-                'CREATE',
-                'MOVIMENTOS',
-                obj=mvt,
-                changes=f"Movimento {mvt.type_mvt} quantidade {mvt.quantite}.",
-            )
+        # Audit log deyò blok atomic
+        _audit_log(
+            self.request.user,
+            'CREATE',
+            'MOVIMENTOS',
+            obj=mvt,
+            changes=f"Movimento {mvt.type_mvt} quantidade {mvt.quantite}.",
+        )
 
     def perform_update(self, serializer):
         mvt = serializer.save()

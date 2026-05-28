@@ -50,7 +50,6 @@ logs*.txt
 Thumbs.db
 
 # Local runtime artifacts
-ssh/
 scripts/
 media/
 staticfiles/

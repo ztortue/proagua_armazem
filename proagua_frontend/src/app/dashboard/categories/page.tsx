@@ -6,8 +6,18 @@ import { api } from '../lib/api';
 
 const PAGE_SIZE = 10;
 
+const buildCategorieCode = (value: string) => {
+  const normalized = String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]/g, '')
+    .toUpperCase();
+  return normalized.slice(0, 3).padEnd(3, 'X');
+};
+
 type Categorie = {
   id: number;
+  code?: string | null;
   nom: string;
   description?: string;
   famille?: {
@@ -45,7 +55,7 @@ export default function CategoriesPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Categorie | null>(null);
-  const [form, setForm] = useState({ nom: '', description: '', famille_id: '' });
+  const [form, setForm] = useState({ code: '', nom: '', description: '', famille_id: '' });
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Categorie | null>(null);
   const [materiais, setMateriais] = useState<Materiel[]>([]);
@@ -283,13 +293,14 @@ export default function CategoriesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ nom: '', description: '', famille_id: '' });
+    setForm({ code: '', nom: '', description: '', famille_id: '' });
     setModalOpen(true);
   };
 
   const openEdit = (cat: Categorie) => {
     setEditing(cat);
     setForm({
+      code: cat.code || '',
       nom: cat.nom,
       description: cat.description || '',
       famille_id: cat.famille?.id ? String(cat.famille.id) : '',
@@ -304,6 +315,7 @@ export default function CategoriesPage() {
     }
 
     const payload = {
+      code: form.code.trim() || buildCategorieCode(form.nom),
       nom: form.nom.trim(),
       description: form.description.trim() || '',
       ...(form.famille_id && { famille_id: Number(form.famille_id) }),
@@ -390,9 +402,14 @@ export default function CategoriesPage() {
               className="card bg-base-100 shadow-xl hover:shadow-2xl transition-all hover:scale-105 rounded-2xl overflow-hidden cursor-pointer"
             >
               <div className="card-body p-6">
-                <h2 className="card-title text-2xl font-extrabold text-primary">
-                  {cat.nom}
-                </h2>
+                <div className="flex items-center gap-2 mb-1">
+                  {cat.code && (
+                    <span className="badge badge-primary font-mono font-bold">{cat.code}</span>
+                  )}
+                  <h2 className="card-title text-2xl font-extrabold text-primary">
+                    {cat.nom}
+                  </h2>
+                </div>
                 <p className="text-sm opacity-80 mt-2">
                   {cat.description || 'Sem descricao'}
                 </p>
@@ -449,7 +466,13 @@ export default function CategoriesPage() {
                   placeholder="Nome da categoria"
                   className="input input-bordered w-full"
                   value={form.nom}
-                  onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                  onChange={(e) => setForm({ ...form, nom: e.target.value, code: form.code || buildCategorieCode(e.target.value) })}
+                />
+                <input
+                  placeholder="Código (ex: TUB, VAL, RAC)"
+                  className="input input-bordered w-full bg-base-200 font-mono"
+                  value={form.code || buildCategorieCode(form.nom)}
+                  onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().slice(0, 10) })}
                 />
 
                 <textarea

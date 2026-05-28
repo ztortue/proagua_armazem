@@ -115,6 +115,13 @@ class Categorie(models.Model):
     Categorie = Kategori prensipal oswa sous-kategori
     Hierarki: Famille → Categorie Parent → Categorie Enfant
     """
+    code = models.CharField(
+        "Code Catégorie",
+        max_length=10,
+        null=True,
+        blank=True,
+        help_text="Code court unique dans la famille (ex: TUB, VAL, RAC)"
+    )
     nom = models.CharField("Nome da Categoria", max_length=100)
     description = models.TextField("Descrição", blank=True)
     
@@ -166,13 +173,20 @@ class SousCategorie(models.Model):
     Categorie = Kategori prensipal oswa sous-kategori
     Hierarki: Famille → Categorie Parent → Categorie Enfant
     """
+    code = models.CharField(
+        "Code Sous-catégorie",
+        max_length=10,
+        null=True,
+        blank=True,
+        help_text="Code court unique dans la catégorie (ex: PVC, ACR, GAL)"
+    )
     nom = models.CharField("Nome da Subcategoria", max_length=100)
     description = models.TextField("Descrição", blank=True)
-    
+
     # ✅ NOUVO: Relasyon ak Categorie
     categorie = models.ForeignKey(
-        Categorie, 
-        on_delete=models.CASCADE, 
+        Categorie,
+        on_delete=models.CASCADE,
         related_name='sous_categories',
         verbose_name='Categorie',
         null=True,  # Pou compatibility ak done ki deja genyen
@@ -452,8 +466,9 @@ class Materiel(models.Model):
     def _generate_code_base(self) -> str:
         famille = self.categorie.famille if self.categorie and self.categorie.famille else None
         famille_raw = (famille.code if famille and famille.code else (famille.nom if famille else ''))
-        categorie_raw = self.categorie.nom if self.categorie else ''
-        souscategorie_raw = self.souscategorie.nom if self.souscategorie else ''
+        # Prefer explicit .code over .nom for uniqueness
+        categorie_raw = (self.categorie.code if self.categorie and self.categorie.code else (self.categorie.nom if self.categorie else ''))
+        souscategorie_raw = (self.souscategorie.code if self.souscategorie and self.souscategorie.code else (self.souscategorie.nom if self.souscategorie else ''))
 
         fam = self._token3(famille_raw or 'MAT', 'MAT')
         cat = self._token3(categorie_raw or 'CAT', 'CAT')

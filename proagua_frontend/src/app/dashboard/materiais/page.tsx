@@ -304,8 +304,9 @@ function MateriaisContent() {
       }
       return;
     }
-    const categorieCode = mapCategorieCode(categorieNom);
-    const sousCategorieCode = mapSousCategorieCode(sousCategorieNom);
+    // Prefer explicit .code (set by user) over derived from .nom
+    const categorieCode = mapCategorieCode(selectedCategory?.code || categorieNom);
+    const sousCategorieCode = mapSousCategorieCode(selectedSousCategory?.code || sousCategorieNom);
     const prefix = `${mapFamilleCode(familleCode, familleNom)}-${categorieCode}-${sousCategorieCode}`;
     const regex = new RegExp(`^${prefix}-([0-9]{4})$`);
     let maxSeq = 0;

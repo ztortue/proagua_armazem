@@ -920,7 +920,7 @@ class CategorieSerializer(serializers.ModelSerializer):
     parent_nom = serializers.CharField(source='parent.nom', read_only=True)
     class Meta:
         model = Categorie
-        fields = ['id', 'nom', 'description', 'famille', 'famille_id', 'parent', 'parent_nom', 'chemin_complet']  # Tout chan yo (nom, description, parent)
+        fields = ['id', 'code', 'nom', 'description', 'famille', 'famille_id', 'parent', 'parent_nom', 'chemin_complet']
 
 
 class SousCategorieSerializer(serializers.ModelSerializer):
@@ -936,7 +936,7 @@ class SousCategorieSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SousCategorie
-        fields = ['id', 'nom', 'description', 'categorie', 'categorie_id', 'categorie_nom']
+        fields = ['id', 'code', 'nom', 'description', 'categorie', 'categorie_id', 'categorie_nom']
 
 
 class FournisseurSerializer(serializers.ModelSerializer):

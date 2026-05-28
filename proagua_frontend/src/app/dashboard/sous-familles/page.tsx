@@ -5,6 +5,15 @@ import { api } from '../lib/api';
 
 const PAGE_SIZE = 20;
 
+const buildSousCategorieCode = (value: string) => {
+  const normalized = String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]/g, '')
+    .toUpperCase();
+  return normalized.slice(0, 3).padEnd(3, 'X');
+};
+
 type Me = {
   role?: 'ADMIN' | 'MANAGER' | 'USER' | 'CONSULTATION';
 };
@@ -20,6 +29,7 @@ type Categorie = {
 
 type SousFamille = {
   id: number;
+  code?: string | null;
   nom: string;
   description?: string | null;
   categorie?: number | null;
@@ -37,7 +47,7 @@ export default function SousFamillesPage() {
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SousFamille | null>(null);
-  const [form, setForm] = useState({ nom: '', description: '', categorie_id: '' });
+  const [form, setForm] = useState({ code: '', nom: '', description: '', categorie_id: '' });
 
   const canUsePage = me?.role === 'ADMIN' || me?.role === 'MANAGER' || me?.role === 'USER';
 
@@ -117,13 +127,14 @@ export default function SousFamillesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ nom: '', description: '', categorie_id: '' });
+    setForm({ code: '', nom: '', description: '', categorie_id: '' });
     setModalOpen(true);
   };
 
   const openEdit = (row: SousFamille) => {
     setEditing(row);
     setForm({
+      code: row.code || '',
       nom: row.nom,
       description: row.description || '',
       categorie_id: row.categorie ? String(row.categorie) : '',
@@ -135,7 +146,7 @@ export default function SousFamillesPage() {
     if (saving) return;
     setModalOpen(false);
     setEditing(null);
-    setForm({ nom: '', description: '', categorie_id: '' });
+    setForm({ code: '', nom: '', description: '', categorie_id: '' });
   };
 
   const handleSubmit = async () => {
@@ -151,6 +162,7 @@ export default function SousFamillesPage() {
     try {
       setSaving(true);
       const payload = {
+        code: form.code.trim() || buildSousCategorieCode(nom),
         nom,
         description: form.description.trim() || '',
         categorie_id: Number(form.categorie_id),
@@ -239,6 +251,7 @@ export default function SousFamillesPage() {
           <table className="table table-zebra">
             <thead className="bg-base-300">
               <tr>
+                <th>Código</th>
                 <th>Nome</th>
                 <th>Categoria</th>
                 <th>Descrição</th>
@@ -251,6 +264,7 @@ export default function SousFamillesPage() {
                 const familyName = category?.famille?.nom || '-';
                 return (
                   <tr key={row.id} className="hover">
+                    <td className="font-mono font-semibold">{row.code || '-'}</td>
                     <td className="font-semibold">{row.nom}</td>
                     <td>
                       <div>{row.categorie_nom || category?.nom || '-'}</div>
@@ -321,7 +335,14 @@ export default function SousFamillesPage() {
                   className="input input-bordered w-full"
                   placeholder="Nome da subcategoria"
                   value={form.nom}
-                  onChange={(e) => setForm((prev) => ({ ...prev, nom: e.target.value }))}
+                  onChange={(e) => setForm((prev) => ({ ...prev, nom: e.target.value, code: prev.code || buildSousCategorieCode(e.target.value) }))}
+                />
+                <input
+                  type="text"
+                  className="input input-bordered w-full bg-base-200 font-mono"
+                  placeholder="Código (ex: PVC, ACR, GAL)"
+                  value={form.code || buildSousCategorieCode(form.nom)}
+                  onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase().slice(0, 10) }))}
                 />
                 <select
                   className="select select-bordered w-full"

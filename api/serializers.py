@@ -924,6 +924,7 @@ class CategorieSerializer(serializers.ModelSerializer):
 
 
 class SousCategorieSerializer(serializers.ModelSerializer):
+    categorie = serializers.PrimaryKeyRelatedField(read_only=True)
     categorie_id = serializers.PrimaryKeyRelatedField(
         queryset=Categorie.objects.all(),
         source='categorie',

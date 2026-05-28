@@ -324,26 +324,24 @@ function MateriaisContent() {
   const isHydraulicTypeSelected = useMemo(() => {
     const selectedCategory = categories.find((cat: any) => String(cat.id) === String(nouveauMateriel.categorie_id));
     const selectedSousCategory = sousCategories.find((sc: any) => String(sc.id) === String(nouveauMateriel.souscategorie_id));
-    const selectedFamilleNom =
-      categories.find((cat: any) => String(cat?.famille?.id || '') === selectedFamilleId)?.famille?.nom || '';
     const tokens = normalizeText(
       [
-        selectedFamilleNom,
         selectedCategory?.nom || '',
         selectedSousCategory?.nom || '',
       ].join(' ')
     );
     return [
-      'HIDRAUL', 'TUBO', 'TUBUL', 'VALV', 'FLANGE', 'CONEX',
+      'HIDRAUL', 'TUBO', 'TUBUL', 'VALV', 'FLANGE', 'CONEX', 'JUNTA', 'VEDAC',
       'ADUCAO', 'DISTRIBU', 'DEBIT', 'CAUDAL', 'MEDIDOR', 'MANOMET', 'PRESSAO',
+      'COLAR', 'ABRACAD', 'RACOR', 'FITTING', 'MANGA', 'ANEL', 'GAXETA',
     ].some((keyword) => tokens.includes(keyword));
-  }, [selectedFamilleId, nouveauMateriel.categorie_id, nouveauMateriel.souscategorie_id, categories, sousCategories]);
+  }, [nouveauMateriel.categorie_id, nouveauMateriel.souscategorie_id, categories, sousCategories]);
 
   useEffect(() => {
     if (isHydraulicTypeSelected) return;
     if (!nouveauMateriel.diametre_nominal && !nouveauMateriel.pression_nominal) return;
     setNouveauMateriel((prev) => ({ ...prev, diametre_nominal: '', pression_nominal: '' }));
-  }, [isHydraulicTypeSelected, nouveauMateriel.diametre_nominal, nouveauMateriel.pression_nominal]);
+  }, [isHydraulicTypeSelected]);
 
   useEffect(() => {
     setPage(1);
@@ -377,7 +375,7 @@ function MateriaisContent() {
   const sousCategoriesCreateOptions = useMemo(() => {
     if (!nouveauMateriel.categorie_id) return [];
     const list = sousCategories
-      .filter((sc: any) => String(sc?.categorie || sc?.categorie_id || '') === String(nouveauMateriel.categorie_id))
+      .filter((sc: any) => String(sc.categorie) === String(nouveauMateriel.categorie_id))
       .map((sc: any) => ({ id: String(sc.id), nom: String(sc.nom || '') }));
     return list.sort((a, b) => a.nom.localeCompare(b.nom));
   }, [sousCategories, nouveauMateriel.categorie_id]);

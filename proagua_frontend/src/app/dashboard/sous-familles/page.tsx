@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 
+const PAGE_SIZE = 20;
+
 type Me = {
   role?: 'ADMIN' | 'MANAGER' | 'USER' | 'CONSULTATION';
 };
@@ -24,22 +26,14 @@ type SousFamille = {
   categorie_nom?: string | null;
 };
 
-type PageResponse<T> = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-};
-
 export default function SousFamillesPage() {
   const [me, setMe] = useState<Me | null>(null);
+  const [meLoading, setMeLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
-  const [sousFamilles, setSousFamilles] = useState<SousFamille[]>([]);
+  const [allSousFamilles, setAllSousFamilles] = useState<SousFamille[]>([]);
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SousFamille | null>(null);
@@ -47,23 +41,16 @@ export default function SousFamillesPage() {
 
   const canUsePage = me?.role === 'ADMIN' || me?.role === 'MANAGER' || me?.role === 'USER';
 
-  const loadPage = async (pageNum = 1, term = '') => {
+  const loadSousFamilles = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set('page', String(pageNum));
-      if (term.trim()) params.set('search', term.trim());
-      const res = await api.get<PageResponse<SousFamille>>(`/souscategories/?${params.toString()}`);
+      const res = await api.get('/souscategories/');
       const data = res.data;
-      setSousFamilles(data.results || []);
-      setTotalCount(data.count || 0);
-      setTotalPages(Math.max(1, Math.ceil((data.count || 0) / 20)));
-      setPage(pageNum);
+      const rows: SousFamille[] = Array.isArray(data) ? data : data.results || [];
+      setAllSousFamilles(rows);
     } catch (error) {
       console.error('Erro ao carregar sous-familles:', error);
-      setSousFamilles([]);
-      setTotalCount(0);
-      setTotalPages(1);
+      setAllSousFamilles([]);
     } finally {
       setLoading(false);
     }
@@ -71,19 +58,10 @@ export default function SousFamillesPage() {
 
   const loadCategories = async () => {
     try {
-      const collected: Categorie[] = [];
-      let pageNum = 1;
-      let next: string | null = null;
-
-      do {
-        const res = await api.get<PageResponse<Categorie>>(`/categories/?page=${pageNum}`);
-        const data = res.data;
-        collected.push(...(data.results || []));
-        next = data.next;
-        pageNum += 1;
-      } while (next);
-
-      setCategories(collected);
+      const res = await api.get('/categories/');
+      const data = res.data;
+      const rows: Categorie[] = Array.isArray(data) ? data : data.results || [];
+      setCategories(rows);
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
       setCategories([]);
@@ -95,15 +73,47 @@ export default function SousFamillesPage() {
       try {
         const meRes = await api.get('/me/');
         setMe(meRes.data || null);
-      } catch (error) {
-        console.error('Erro ao carregar utilizador atual:', error);
+      } catch {
         setMe(null);
+      } finally {
+        setMeLoading(false);
       }
-      await Promise.all([loadPage(1), loadCategories()]);
+      await Promise.all([loadSousFamilles(), loadCategories()]);
     };
-
     init();
   }, []);
+
+  const categoriesById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  );
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return allSousFamilles;
+    return allSousFamilles.filter((row) => {
+      const catLabel = row.categorie_nom || categoriesById.get(row.categorie || 0)?.nom || '';
+      return (
+        String(row.nom || '').toLowerCase().includes(term) ||
+        String(row.description || '').toLowerCase().includes(term) ||
+        String(catLabel).toLowerCase().includes(term)
+      );
+    });
+  }, [allSousFamilles, search, categoriesById]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
+    [filtered]
+  );
+  const pageItems = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  );
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -131,14 +141,13 @@ export default function SousFamillesPage() {
   const handleSubmit = async () => {
     const nom = form.nom.trim();
     if (!nom) {
-      alert('O nome da sous-famille e obrigatorio.');
+      alert('O nome da subcategoria e obrigatorio.');
       return;
     }
     if (!form.categorie_id) {
-      alert('Selecione a categoria da sous-famille.');
+      alert('Selecione a categoria.');
       return;
     }
-
     try {
       setSaving(true);
       const payload = {
@@ -146,23 +155,21 @@ export default function SousFamillesPage() {
         description: form.description.trim() || '',
         categorie_id: Number(form.categorie_id),
       };
-
       if (editing) {
         await api.patch(`/souscategories/${editing.id}/`, payload);
-        alert('Sous-famille atualizada com sucesso.');
+        alert('Subcategoria atualizada com sucesso.');
       } else {
         await api.post('/souscategories/', payload);
-        alert('Sous-famille criada com sucesso.');
+        alert('Subcategoria criada com sucesso.');
       }
-
       closeModal();
-      await loadPage(page, search);
+      await loadSousFamilles();
     } catch (error: any) {
       const msg =
         error?.response?.data?.detail ||
         error?.response?.data?.nom?.[0] ||
         error?.response?.data?.categorie_id?.[0] ||
-        'Erro ao guardar a sous-famille.';
+        'Erro ao guardar a subcategoria.';
       alert(String(msg));
     } finally {
       setSaving(false);
@@ -170,42 +177,19 @@ export default function SousFamillesPage() {
   };
 
   const handleDelete = async (row: SousFamille) => {
-    const confirmed = confirm(`Supprimer la sous-famille "${row.nom}" ?`);
-    if (!confirmed) return;
-
+    if (!confirm(`Apagar a subcategoria "${row.nom}"?`)) return;
     try {
       await api.delete(`/souscategories/${row.id}/`);
-      alert('Sous-famille supprimida com sucesso.');
-      const targetPage = sousFamilles.length === 1 && page > 1 ? page - 1 : page;
-      await loadPage(targetPage, search);
+      alert('Subcategoria apagada com sucesso.');
+      await loadSousFamilles();
     } catch (error: any) {
-      const msg =
-        error?.response?.data?.detail ||
-        'Erro ao remover a sous-famille.';
-      alert(String(msg));
+      alert('Erro ao apagar: ' + (error?.response?.data?.detail || 'Erro desconhecido'));
     }
   };
 
-  const categoriesById = useMemo(() => {
-    return new Map(categories.map((item) => [item.id, item]));
-  }, [categories]);
-
-  const visibleRows = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return sousFamilles;
-    return sousFamilles.filter((row) => {
-      const categoryLabel = row.categorie_nom || categoriesById.get(row.categorie || 0)?.nom || '';
-      return (
-        String(row.nom || '').toLowerCase().includes(term) ||
-        String(row.description || '').toLowerCase().includes(term) ||
-        String(categoryLabel || '').toLowerCase().includes(term)
-      );
-    });
-  }, [categoriesById, search, sousFamilles]);
-
-  if (loading && !me) {
+  if (meLoading) {
     return (
-      <div className="flex justify-center itemscenter min-h-screen">
+      <div className="flex justify-center items-center min-h-screen">
         <span className="loading loading-spinner loading-lg" />
       </div>
     );
@@ -215,7 +199,7 @@ export default function SousFamillesPage() {
     return (
       <div className="p-8">
         <div className="alert alert-error">
-          Acesso negado: apenas Admin, Manager e Usuario podem usar sous-familles.
+          Acesso negado: apenas Admin, Manager e Usuario podem usar subcategorias.
         </div>
       </div>
     );
@@ -224,11 +208,11 @@ export default function SousFamillesPage() {
   return (
     <div className="p-8 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between itemscenter mb-8">
+        <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold text-primary">Subcategorias</h1>
             <p className="text-lg opacity-70 mt-2">
-              Total: <span className="font-bold">{totalCount}</span> - Pagina <span className="font-bold">{page}</span> / <span className="font-bold">{totalPages}</span>
+              {filtered.length} subcategoria{filtered.length !== 1 ? 's' : ''} · página {page} de {totalPages}
             </p>
           </div>
           <button className="btn btn-primary" onClick={openCreate}>
@@ -236,31 +220,33 @@ export default function SousFamillesPage() {
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="mb-6">
           <input
             type="text"
             placeholder="Pesquisar subcategoria..."
             className="input input-bordered w-full max-w-lg"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            defaultValue=""
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
-          <button className="btn btn-outline" onClick={() => loadPage(1, search)}>
-            Rechercher
-          </button>
         </div>
 
-        <div className="overflow-x-auto shadow-2xl rounded-xl border">
+        <div className="overflow-x-auto shadow-2xl rounded-xl border min-h-[200px] relative">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-base-100/60 z-10 rounded-xl">
+              <span className="loading loading-spinner loading-md" />
+            </div>
+          )}
           <table className="table table-zebra">
             <thead className="bg-base-300">
               <tr>
                 <th>Nome</th>
                 <th>Categoria</th>
-                <th>Descricao</th>
-                <th className="text-right">Acoes</th>
+                <th>Descrição</th>
+                <th className="text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map((row) => {
+              {pageItems.map((row) => {
                 const category = categoriesById.get(row.categorie || 0);
                 const familyName = category?.famille?.nom || '-';
                 return (
@@ -288,29 +274,40 @@ export default function SousFamillesPage() {
           </table>
         </div>
 
-        {visibleRows.length === 0 && !loading && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center text-xl text-gray-500 mt-8">Nenhuma subcategoria encontrada</div>
         )}
 
-        <div className="flex justify-center gap-4 mt-8">
-          <button
-            className="btn btn-outline btn-primary"
-            onClick={() => loadPage(Math.max(1, page - 1), search)}
-            disabled={page <= 1 || loading}
-          >
-            {'<'} Anterior
-          </button>
-          <span className="flex itemscenter font-bold">
-            Pagina {page} de {totalPages}
-          </span>
-          <button
-            className="btn btn-outline btn-primary"
-            onClick={() => loadPage(Math.min(totalPages, page + 1), search)}
-            disabled={page >= totalPages || loading}
-          >
-            Proxima {'>'}
-          </button>
-        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <span className="text-sm text-base-content/60">
+              {filtered.length} subcategoria{filtered.length !== 1 ? 's' : ''} · página {page} de {totalPages}
+            </span>
+            <div className="join">
+              <button
+                className="join-item btn btn-sm"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage(1)}
+              >«</button>
+              <button
+                className="join-item btn btn-sm"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => p - 1)}
+              >‹ Anterior</button>
+              <button className="join-item btn btn-sm btn-active pointer-events-none">{page}</button>
+              <button
+                className="join-item btn btn-sm"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >Próxima ›</button>
+              <button
+                className="join-item btn btn-sm"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage(totalPages)}
+              >»</button>
+            </div>
+          </div>
+        )}
 
         {modalOpen && (
           <div className="modal modal-open">
@@ -332,15 +329,15 @@ export default function SousFamillesPage() {
                   onChange={(e) => setForm((prev) => ({ ...prev, categorie_id: e.target.value }))}
                 >
                   <option value="">Selecione a categoria</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.famille?.nom ? `${category.famille.nom} -> ` : ''}{category.nom}
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.famille?.nom ? `${cat.famille.nom} → ` : ''}{cat.nom}
                     </option>
                   ))}
                 </select>
                 <textarea
                   className="textarea textarea-bordered w-full"
-                  placeholder="Descricao (opcional)"
+                  placeholder="Descrição (opcional)"
                   value={form.description}
                   onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 />

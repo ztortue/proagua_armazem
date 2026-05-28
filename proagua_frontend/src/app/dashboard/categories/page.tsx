@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../lib/api';
+
+const PAGE_SIZE = 10;
 
 type Categorie = {
   id: number;
@@ -21,13 +23,6 @@ type Famille = {
   nom: string;
 };
 
-type PageResponse = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Categorie[];
-};
-
 type Materiel = {
   id: number;
   code: string;
@@ -43,12 +38,9 @@ type Materiel = {
 
 export default function CategoriesPage() {
   const router = useRouter();
-  const [categories, setCategories] = useState<Categorie[]>([]);
+  const [allCategories, setAllCategories] = useState<Categorie[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [allCategories, setAllCategories] = useState<Categorie[]>([]);
   const [familles, setFamilles] = useState<Famille[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -68,39 +60,27 @@ export default function CategoriesPage() {
   const [selectedEntrepotIds, setSelectedEntrepotIds] = useState<Record<number, string>>({});
   const [movementLoading, setMovementLoading] = useState(false);
 
-  const load = async (pageNum = 1) => {
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(allCategories.length / PAGE_SIZE)),
+    [allCategories]
+  );
+  const pageItems = useMemo(
+    () => allCategories.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [allCategories, page]
+  );
+
+  const load = async () => {
     setLoading(true);
     try {
-      const res = await api.get<PageResponse>(`/categories/?page=${pageNum}`);
+      const res = await api.get('/categories/');
       const data = res.data;
-      setCategories(data.results || []);
-      setTotalCount(data.count || 0);
-      setTotalPages(Math.max(1, Math.ceil((data.count || 0) / 20)));
-      setPage(pageNum);
+      const rows: Categorie[] = Array.isArray(data) ? data : data.results || [];
+      setAllCategories(rows);
+      setPage(1);
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadAllCategories = async () => {
-    const all: Categorie[] = [];
-    let pageNum = 1;
-    let next: string | null = null;
-
-    try {
-      do {
-        const res = await api.get<PageResponse>(`/categories/?page=${pageNum}`);
-        const data = res.data;
-        all.push(...(data.results || []));
-        next = data.next;
-        pageNum += 1;
-      } while (next);
-
-      setAllCategories(all);
-    } catch (error) {
-      console.error('Erro ao carregar todas as categorias:', error);
     }
   };
 
@@ -116,8 +96,7 @@ export default function CategoriesPage() {
   };
 
   useEffect(() => {
-    load(1);
-    loadAllCategories();
+    load();
     loadFamilles();
   }, []);
 
@@ -223,25 +202,25 @@ export default function CategoriesPage() {
       const entrepotId = selectedEntrepotIds[id] || '';
 
       if (!material) {
-        errors.push(`Material ${id} n\u00e3o encontrado.`);
+        errors.push(`Material ${id} não encontrado.`);
         continue;
       }
       if (!qty || qty <= 0) {
-        errors.push(`Quantidade inv\u00e1lida para ${material.code}.`);
+        errors.push(`Quantidade inválida para ${material.code}.`);
         continue;
       }
       if (!entrepotId) {
-        errors.push(`Selecione um dep\u00f3sito para ${material.code}.`);
+        errors.push(`Selecione um depósito para ${material.code}.`);
         continue;
       }
       if (type === 'SORTIE') {
         const available = getAvailableStock(material, entrepotId);
         if (available <= 0) {
-          errors.push(`Sem stock dispon\u00edvel para ${material.code} neste dep\u00f3sito.`);
+          errors.push(`Sem stock disponível para ${material.code} neste depósito.`);
           continue;
         }
         if (qty > available) {
-          errors.push(`Stock insuficiente para ${material.code}: dispon\u00edvel ${available}.`);
+          errors.push(`Stock insuficiente para ${material.code}: disponível ${available}.`);
           continue;
         }
         pedidoItems.push({
@@ -339,8 +318,7 @@ export default function CategoriesPage() {
         alert('Categoria criada com sucesso!');
       }
       setModalOpen(false);
-      load(page);
-      loadAllCategories();
+      load();
     } catch (error: any) {
       alert('Erro: ' + (error.response?.data?.detail || 'Erro desconhecido'));
     }
@@ -348,21 +326,46 @@ export default function CategoriesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center itemscenter min-h-screen">
+      <div className="flex justify-center items-center min-h-screen">
         <span className="loading loading-spinner loading-lg text-primary"></span>
       </div>
     );
   }
 
+  const PaginationControls = () => (
+    <div className="join">
+      <button
+        className="join-item btn btn-sm"
+        disabled={page <= 1}
+        onClick={() => setPage(1)}
+      >«</button>
+      <button
+        className="join-item btn btn-sm"
+        disabled={page <= 1}
+        onClick={() => setPage((p) => p - 1)}
+      >‹ Anterior</button>
+      <button className="join-item btn btn-sm btn-active pointer-events-none">{page}</button>
+      <button
+        className="join-item btn btn-sm"
+        disabled={page >= totalPages}
+        onClick={() => setPage((p) => p + 1)}
+      >Próxima ›</button>
+      <button
+        className="join-item btn btn-sm"
+        disabled={page >= totalPages}
+        onClick={() => setPage(totalPages)}
+      >»</button>
+    </div>
+  );
+
   return (
     <div className="p-8 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER + PAGINATION TOP */}
-        <div className="flex justify-between itemscenter mb-8">
+        <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-5xl font-bold text-primary">Gestão de Categorias</h1>
             <p className="text-lg opacity-70 mt-2">
-              Total: <span className="font-bold">{totalCount}</span> - Página <span className="font-bold">{page}</span> / <span className="font-bold">{totalPages}</span>
+              {allCategories.length} categoria{allCategories.length !== 1 ? 's' : ''} · página {page} de {totalPages}
             </p>
           </div>
           <button onClick={openCreate} className="btn btn-success btn-lg shadow-lg hover:shadow-xl transition-shadow">
@@ -370,30 +373,17 @@ export default function CategoriesPage() {
           </button>
         </div>
 
-        {/* PAGINATION TOP */}
-        <div className="flex justify-center gap-4 mb-8">
-          <button
-            onClick={() => load(Math.max(1, page - 1))}
-            disabled={page <= 1}
-            className="btn btn-outline btn-primary"
-          >
-            {'<'} Anterior
-          </button>
-          <span className="flex itemscenter font-bold">
-            Página {page} de {totalPages}
-          </span>
-          <button
-            onClick={() => load(Math.min(totalPages, page + 1))}
-            disabled={page >= totalPages}
-            className="btn btn-outline btn-primary"
-          >
-            Próxima {'>'}
-          </button>
-        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mb-6">
+            <span className="text-sm text-base-content/60">
+              Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, allCategories.length)} de {allCategories.length}
+            </span>
+            <PaginationControls />
+          </div>
+        )}
 
-        {/* GRID DE CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {categories.map((cat) => (
+          {pageItems.map((cat) => (
             <div
               key={cat.id}
               onClick={() => openDetails(cat)}
@@ -434,28 +424,19 @@ export default function CategoriesPage() {
           ))}
         </div>
 
-        {/* PAGINATION BOTTOM */}
-        <div className="flex justify-center gap-4 mt-12">
-          <button
-            onClick={() => load(Math.max(1, page - 1))}
-            disabled={page <= 1}
-            className="btn btn-outline btn-primary"
-          >
-            {'<'} Anterior
-          </button>
-          <span className="flex itemscenter font-bold">
-            Página {page} de {totalPages}
-          </span>
-          <button
-            onClick={() => load(Math.min(totalPages, page + 1))}
-            disabled={page >= totalPages}
-            className="btn btn-outline btn-primary"
-          >
-            Próxima {'>'}
-          </button>
-        </div>
+        {allCategories.length === 0 && (
+          <div className="text-center text-xl text-gray-500 mt-8">Nenhuma categoria encontrada</div>
+        )}
 
-        {/* MODAL */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-10">
+            <span className="text-sm text-base-content/60">
+              {allCategories.length} categoria{allCategories.length !== 1 ? 's' : ''} · página {page} de {totalPages}
+            </span>
+            <PaginationControls />
+          </div>
+        )}
+
         {modalOpen && (
           <div className="modal modal-open">
             <div className="modal-box max-w-lg">

@@ -1700,6 +1700,7 @@ class UsoTipicoViewSet(viewsets.ModelViewSet):
 class FamilleViewSet(viewsets.ModelViewSet):
     queryset = Famille.objects.all().order_by('ordre', 'nom')
     serializer_class = FamilleSerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'me', 'set_my_password']:
@@ -1713,6 +1714,7 @@ class FamilleViewSet(viewsets.ModelViewSet):
 class CategorieViewSet(viewsets.ModelViewSet):
     queryset = Categorie.objects.all().order_by('nom')
     serializer_class = CategorieSerializer
+    pagination_class = None
 
     def get_permissions(self):
         # ✅ LIST & RETRIEVE - Tout moun otantifye
@@ -1725,6 +1727,7 @@ class CategorieViewSet(viewsets.ModelViewSet):
 class SousCategorieViewSet(viewsets.ModelViewSet):
     queryset = SousCategorie.objects.select_related('categorie').order_by('nom')
     serializer_class = SousCategorieSerializer
+    pagination_class = None
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
     filterset_fields = ['categorie']
     search_fields = ['nom', 'description', 'categorie__nom']

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 
 type Me = {
@@ -14,52 +14,61 @@ type Famille = {
   description?: string | null;
 };
 
-type PaginatedResponse<T> = {
-  count?: number;
-  next?: string | null;
-  results: T[];
-};
+const PAGE_SIZE = 10;
 
 export default function FamillesPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [meLoading, setMeLoading] = useState(true);
   const [familles, setFamilles] = useState<Famille[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [tableLoading, setTableLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ nom: '', description: '' });
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const buildFamilleCode = (value: string) => {
     const normalized = String(value || '')
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[̀-ͯ]/g, '')
       .replace(/[^A-Za-z0-9]/g, '')
       .toUpperCase();
     return normalized.slice(0, 3).padEnd(3, 'X');
   };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [meRes, famRes] = await Promise.all([
-          api.get('/me/'),
-          api.get('/familles/'),
-        ]);
-        setMe(meRes.data || null);
-
-        const data: PaginatedResponse<Famille> | Famille[] = famRes.data;
-        const rows = Array.isArray(data) ? data : data.results || [];
-        setFamilles(rows);
-      } catch (error) {
-        console.error('Erro ao carregar famílias:', error);
-        setFamilles([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
+    api.get('/me/').then((res) => setMe(res.data || null)).finally(() => setMeLoading(false));
   }, []);
+
+  useEffect(() => {
+    setTableLoading(true);
+    api
+      .get('/familles/', { params: { page, search: search.trim() || undefined } })
+      .then((res) => {
+        const data = res.data;
+        if (Array.isArray(data)) {
+          setFamilles(data);
+          setTotalCount(data.length);
+        } else {
+          setFamilles(data.results || []);
+          setTotalCount(data.count || 0);
+        }
+      })
+      .catch(() => { setFamilles([]); setTotalCount(0); })
+      .finally(() => setTableLoading(false));
+  }, [page, search]);
+
+  const handleSearchChange = (value: string) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      setSearch(value);
+    }, 400);
+  };
 
   const canView = me?.role === 'ADMIN' || me?.role === 'MANAGER';
 
@@ -69,7 +78,6 @@ export default function FamillesPage() {
       alert('O nome da família é obrigatório.');
       return;
     }
-
     try {
       setSaving(true);
       const payload = {
@@ -77,12 +85,11 @@ export default function FamillesPage() {
         nom,
         description: form.description.trim() || '',
       };
-      const res = await api.post('/familles/', payload);
-      const created: Famille = res.data;
-      setFamilles((prev) => [created, ...prev]);
+      await api.post('/familles/', payload);
       setForm({ nom: '', description: '' });
       setModalOpen(false);
-      alert('Família criada com sucesso.');
+      setPage(1);
+      setSearch('');
     } catch (error: any) {
       const msg =
         error?.response?.data?.detail ||
@@ -94,19 +101,9 @@ export default function FamillesPage() {
     }
   };
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return familles;
-    return familles.filter((f) =>
-      String(f.code || '').toLowerCase().includes(term) ||
-      String(f.nom || '').toLowerCase().includes(term) ||
-      String(f.description || '').toLowerCase().includes(term)
-    );
-  }, [familles, search]);
-
-  if (loading) {
+  if (meLoading) {
     return (
-      <div className="flex justify-center itemscenter min-h-screen">
+      <div className="flex justify-center items-center min-h-screen">
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
@@ -122,7 +119,7 @@ export default function FamillesPage() {
 
   return (
     <div className="p-8">
-      <div className="flex itemscenter justify-between mb-8">
+      <div className="flex items-center justify-between mb-8">
         <h1 className="text-4xl font-bold text-primary">Família</h1>
         <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
           + Nova família
@@ -134,12 +131,17 @@ export default function FamillesPage() {
           type="text"
           placeholder="Pesquisar família..."
           className="input input-bordered w-full max-w-lg"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          defaultValue=""
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
       </div>
 
-      <div className="overflow-x-auto shadow-2xl rounded-xl border">
+      <div className="overflow-x-auto shadow-2xl rounded-xl border min-h-[200px] relative">
+        {tableLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-base-100/60 z-10 rounded-xl">
+            <span className="loading loading-spinner loading-md"></span>
+          </div>
+        )}
         <table className="table table-zebra">
           <thead className="bg-base-300">
             <tr>
@@ -149,7 +151,7 @@ export default function FamillesPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((fam) => (
+            {familles.map((fam) => (
               <tr key={fam.id} className="hover">
                 <td className="font-mono font-semibold">{fam.code || '-'}</td>
                 <td>{fam.nom}</td>
@@ -160,8 +162,49 @@ export default function FamillesPage() {
         </table>
       </div>
 
-      {filtered.length === 0 && (
+      {!tableLoading && familles.length === 0 && (
         <div className="text-center text-xl text-gray-500 mt-8">Nenhuma família encontrada</div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <span className="text-sm text-base-content/60">
+            {totalCount} família{totalCount !== 1 ? 's' : ''} · página {page} de {totalPages}
+          </span>
+          <div className="join">
+            <button
+              className="join-item btn btn-sm"
+              disabled={page <= 1 || tableLoading}
+              onClick={() => setPage(1)}
+            >
+              «
+            </button>
+            <button
+              className="join-item btn btn-sm"
+              disabled={page <= 1 || tableLoading}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              ‹ Anterior
+            </button>
+            <button className="join-item btn btn-sm btn-active pointer-events-none">
+              {page}
+            </button>
+            <button
+              className="join-item btn btn-sm"
+              disabled={page >= totalPages || tableLoading}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Próxima ›
+            </button>
+            <button
+              className="join-item btn btn-sm"
+              disabled={page >= totalPages || tableLoading}
+              onClick={() => setPage(totalPages)}
+            >
+              »
+            </button>
+          </div>
+        </div>
       )}
 
       {modalOpen && (
@@ -193,10 +236,7 @@ export default function FamillesPage() {
             <div className="modal-action">
               <button
                 className="btn btn-ghost"
-                onClick={() => {
-                  if (saving) return;
-                  setModalOpen(false);
-                }}
+                onClick={() => { if (!saving) setModalOpen(false); }}
               >
                 Cancelar
               </button>

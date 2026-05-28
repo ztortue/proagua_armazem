@@ -21,7 +21,7 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = env_bool('DEBUG', default=True)
 ALLOWED_HOSTS = [
     host.strip()
-    for host in config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0').split(',')
+    for host in config('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0,backend,.ngrok-free.app,.ngrok-free.dev,.ngrok.io,.ngrok.app').split(',')
     if host.strip()
 ]
 
@@ -60,11 +60,19 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in config(
         'CORS_ALLOWED_ORIGINS',
-        default='http://localhost:3000,http://127.0.0.1:3000,http://192.168.0.79:3000'
+        default='http://localhost:3000,http://127.0.0.1:3000'
     ).split(',')
     if origin.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# === Sipo ngrok pou aksè eksteryè (devlopman) ===
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.ngrok-free\.app$",
+    r"^https://.*\.ngrok-free\.dev$",
+    r"^https://.*\.ngrok\.io$",
+    r"^https://.*\.ngrok\.app$",
+]
 
 ROOT_URLCONF = 'proagua_backend.urls'
 
@@ -219,7 +227,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in config(
         'CSRF_TRUSTED_ORIGINS',
-        default='http://localhost:3000,http://127.0.0.1:3000,http://192.168.0.79:3000,http://192.168.0.233:3000'
+        default='http://localhost:3000,http://127.0.0.1:3000,http://192.168.0.79:3000,http://192.168.0.233:3000,https://*.ngrok-free.app,https://*.ngrok-free.dev,https://*.ngrok.io,https://*.ngrok.app'
     ).split(',')
     if origin.strip()
 ]

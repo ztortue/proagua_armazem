@@ -5,6 +5,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ProAgua - Gestão de Estoque",
   description: "Sistema ERP Suez International Angola",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({

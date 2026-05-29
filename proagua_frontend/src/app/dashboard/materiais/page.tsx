@@ -132,8 +132,7 @@ function MateriaisContent() {
   const [utilisateursFinal, setUtilisateursFinal] = useState<any[]>([]);
   const [selectedDemandeurReelId, setSelectedDemandeurReelId] = useState('');
   const [descricaoDemanda, setDescricaoDemanda] = useState('');
-  const [selectedTipoFluxoDemanda, setSelectedTipoFluxoDemanda] = useState<'INSTALACAO' | 'EMPRESTIMO' | 'COMPRAS' | 'ENTRADA' | 'TRANSFERENCIA'>('INSTALACAO');
-  const [selectedTransferDestinoDemandaId, setSelectedTransferDestinoDemandaId] = useState('');
+  const [selectedTipoFluxoDemanda, setSelectedTipoFluxoDemanda] = useState<'INSTALACAO' | 'EMPRESTIMO' | 'COMPRAS' | 'ENTRADA'>('INSTALACAO');
   const [dataRetornoPrevistaDemanda, setDataRetornoPrevistaDemanda] = useState('');
   const [addItemSearchDemanda, setAddItemSearchDemanda] = useState('');
   const [addItemIdDemanda, setAddItemIdDemanda] = useState('');
@@ -454,19 +453,7 @@ function MateriaisContent() {
       alert('Informe a data/hora prevista de retorno para emprestimo.');
       return;
     }
-    if (selectedTipoFluxoDemanda === 'TRANSFERENCIA') {
-      if (!selectedTransferDestinoDemandaId) {
-        alert('Selecione o deposito de destino para transferencia.');
-        return;
-      }
-      const sameOriginDestino = selectedItems.find(
-        (item) => Number(selectedEntrepotDemanda[item.id]) === Number(selectedTransferDestinoDemandaId)
-      );
-      if (sameOriginDestino) {
-        alert('Origem e destino não podem ser iguais na transferencia.');
-        return;
-      }
-    }
+
     const missingEntrepot = selectedItems.find((item) => !selectedEntrepotDemanda[item.id]);
     if (missingEntrepot) {
       alert(`Selecione o depósito para ${missingEntrepot.code}.`);
@@ -489,10 +476,7 @@ function MateriaisContent() {
           selectedTipoFluxoDemanda === 'EMPRESTIMO' && dataRetornoPrevistaDemanda
             ? new Date(dataRetornoPrevistaDemanda).toISOString()
             : null,
-        entrepot_destino_id:
-          selectedTipoFluxoDemanda === 'TRANSFERENCIA' && selectedTransferDestinoDemandaId
-            ? Number(selectedTransferDestinoDemandaId)
-            : null,
+        entrepot_destino_id: null,
         items,
       });
       alert('Requisição enviada com sucesso! Aguarde aprovação.');
@@ -505,7 +489,6 @@ function MateriaisContent() {
       setSelectedDemandeurReelId('');
       setDescricaoDemanda('');
       setSelectedTipoFluxoDemanda('INSTALACAO');
-      setSelectedTransferDestinoDemandaId('');
       setDataRetornoPrevistaDemanda('');
     } catch (error: any) {
       const data = error.response?.data;
@@ -1225,32 +1208,14 @@ function MateriaisContent() {
                 <select
                   className="select select-bordered w-full"
                   value={selectedTipoFluxoDemanda}
-                  onChange={(e) => {
-                    const next = e.target.value as any;
-                    setSelectedTipoFluxoDemanda(next);
-                    if (next !== 'TRANSFERENCIA') setSelectedTransferDestinoDemandaId('');
-                  }}
+                  onChange={(e) => setSelectedTipoFluxoDemanda(e.target.value as any)}
                 >
                   <option value="INSTALACAO">Saida (Instalação)</option>
                   <option value="EMPRESTIMO">Empréstimo</option>
                   <option value="COMPRAS">Compras</option>
                   <option value="ENTRADA">Entrada</option>
-                  <option value="TRANSFERENCIA">Transferencia</option>
                 </select>
               </div>
-              {selectedTipoFluxoDemanda === 'TRANSFERENCIA' && (
-                <div className="form-control w-full">
-                  <label className="label"><span className="label-text font-semibold">Deposito de destino</span></label>
-                  <select className="select select-bordered w-full" value={selectedTransferDestinoDemandaId} onChange={(e) => setSelectedTransferDestinoDemandaId(e.target.value)}>
-                    <option value="">Selecione o deposito de destino</option>
-                    {entrepots
-                      .filter((ent) => !Object.values(selectedEntrepotDemanda).some((origemId) => Number(origemId) === Number(ent.id)))
-                      .map((ent) => (
-                        <option key={ent.id} value={ent.id}>{ent.nom}</option>
-                      ))}
-                  </select>
-                </div>
-              )}
               {selectedTipoFluxoDemanda === 'EMPRESTIMO' && (
                 <div className="form-control w-full">
                   <label className="label"><span className="label-text font-semibold">Data/hora prevista de retorno</span></label>
@@ -1278,7 +1243,7 @@ function MateriaisContent() {
               </div>
               <div className="flex items-center justify-end gap-3 md:col-span-2">
                 <button
-                  onClick={() => { setModalOpen(false); setAddItemSearchDemanda(''); setAddItemIdDemanda(''); setDescricaoDemanda(''); setSelectedTransferDestinoDemandaId(''); setDataRetornoPrevistaDemanda(''); }}
+                  onClick={() => { setModalOpen(false); setAddItemSearchDemanda(''); setAddItemIdDemanda(''); setDescricaoDemanda(''); setDataRetornoPrevistaDemanda(''); }}
                   className="btn btn-outline"
                 >
                   Cancelar

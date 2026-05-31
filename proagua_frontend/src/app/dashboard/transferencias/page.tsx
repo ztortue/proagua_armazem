@@ -33,7 +33,6 @@ type Pedido = {
 
 type Entrepot = { id: number; nom: string };
 type UtilisateurFinal = { id: number; entreprise?: string };
-
 type PaginatedResponse<T> = { results: T[]; next?: string | null };
 
 type CreateItem = {
@@ -44,13 +43,20 @@ type CreateItem = {
   description: string;
 };
 
+type OrigemMateriel = {
+  id: number;
+  code: string;
+  description: string;
+  stock: number;
+};
+
 function parseOrigemMeta(text?: string) {
   const src = text || '';
   const tipoMatch = src.match(/\[ORIGEM_TIPO:([A-Z_]+)\]/);
   const refMatch = src.match(/\[ORIGEM_REF:([^\]]+)\]/);
   return {
-    tipo: tipoMatch?.[1] || '-',
-    referencia: refMatch?.[1] || '-',
+    tipo: tipoMatch?.[1] || null,
+    referencia: refMatch?.[1] || null,
   };
 }
 
@@ -66,23 +72,20 @@ function TransferenciasContent() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // materiais retiré — origemMateriais construit directement depuis selectedOrigemPedido.items
   const [entrepots, setEntrepots] = useState<Entrepot[]>([]);
   const [utilisateursFinal, setUtilisateursFinal] = useState<UtilisateurFinal[]>([]);
 
-  const [origemFluxoTipo, setOrigemFluxoTipo] = useState<'ENTRADA' | 'COMPRAS'>('ENTRADA');
-  const [selectedOrigemPedidoId, setSelectedOrigemPedidoId] = useState('');
-  const [origemReferencia, setOrigemReferencia] = useState('');
+  const [selectedEntrepotOrigemId, setSelectedEntrepotOrigemId] = useState('');
+  const [selectedEntrepotDestinoId, setSelectedEntrepotDestinoId] = useState('');
   const [observacao, setObservacao] = useState('');
   const [demandeurReelId, setDemandeurReelId] = useState('');
 
+  const [origemMateriais, setOrigemMateriais] = useState<OrigemMateriel[]>([]);
+  const [loadingOrigemMateriais, setLoadingOrigemMateriais] = useState(false);
   const [selectedMaterielId, setSelectedMaterielId] = useState('');
-  const [selectedEntrepotOrigemId, setSelectedEntrepotOrigemId] = useState('');
-  const [selectedEntrepotDestinoId, setSelectedEntrepotDestinoId] = useState('');
   const [quantidade, setQuantidade] = useState('');
   const [items, setItems] = useState<CreateItem[]>([]);
-  const [origemPedidos, setOrigemPedidos] = useState<Pedido[]>([]);
-  const [stockByMaterialOrigem, setStockByMaterialOrigem] = useState<Map<number, number>>(new Map());
+  const [searchMateriel, setSearchMateriel] = useState('');
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
@@ -94,30 +97,12 @@ function TransferenciasContent() {
     let nextPath: string | null = '/pedidos/?page=1';
     while (nextPath) {
       const res: { data: Pedido[] | PaginatedResponse<Pedido> } = await api.get(nextPath);
-      const data: Pedido[] | PaginatedResponse<Pedido> = res.data;
+      const data = res.data;
       const batch: Pedido[] = Array.isArray(data) ? data : data.results || [];
       collected.push(...batch);
-      nextPath = Array.isArray(data) ? null : data.next || null;
+      nextPath = Array.isArray(data) ? null : (data.next ? new URL(data.next).pathname + new URL(data.next).search : null);
     }
     return collected;
-  };
-
-
-  const fetchStockByEntrepot = async (entrepotId: number): Promise<Map<number, number>> => {
-    const map = new Map<number, number>();
-    let nextPath: string | null = `/stock-entrepot/?mode=transfer&entrepot=${entrepotId}&page=1`;
-    while (nextPath) {
-      const res: { data: any[] | PaginatedResponse<any> } = await api.get(nextPath);
-      const data: any[] | PaginatedResponse<any> = res.data;
-      const rows: any[] = Array.isArray(data) ? data : data.results || [];
-      rows.forEach((row: any) => {
-        const materielId = Number(row.materiel_id_value || row.materiel_id || 0);
-        if (!materielId) return;
-        map.set(materielId, Number(row.quantite || 0));
-      });
-      nextPath = Array.isArray(data) ? null : data.next || null;
-    }
-    return map;
   };
 
   const loadTransferencias = async () => {
@@ -142,105 +127,56 @@ function TransferenciasContent() {
 
   const loadCreateDependencies = async () => {
     try {
-      const [entrepotsRes, demandeurRes, allPedidos] = await Promise.all([
-        api.get('/entrepots/?mode=transfer'),
+      const [entrepotsRes, demandeurRes] = await Promise.all([
+        api.get('/entrepots/'),
         api.get('/utilisateurs-final/'),
-        fetchAllPedidos(),
       ]);
-      setEntrepots(entrepotsRes.data?.results || entrepotsRes.data || []);
-      setUtilisateursFinal(demandeurRes.data?.results || demandeurRes.data || []);
-      setOrigemPedidos(allPedidos);
+      setEntrepots(Array.isArray(entrepotsRes.data) ? entrepotsRes.data : entrepotsRes.data?.results || []);
+      setUtilisateursFinal(Array.isArray(demandeurRes.data) ? demandeurRes.data : demandeurRes.data?.results || []);
     } catch (error) {
-      console.error('Erro ao carregar dados do modal de transferencia:', error);
+      console.error('Erro ao carregar dados:', error);
+    }
+  };
+
+  const loadMateriaisOrigem = async (entrepotId: number) => {
+    setLoadingOrigemMateriais(true);
+    setOrigemMateriais([]);
+    try {
+      const res = await api.get(`/materiais/?entrepot=${entrepotId}`);
+      const data = res.data;
+      const list: any[] = Array.isArray(data) ? data : data.results || [];
+      const result: OrigemMateriel[] = list
+        .map((m: any) => {
+          const loc = (m.stock_locations || []).find(
+            (l: any) => Number(l.entrepot_id ?? l.id) === entrepotId
+          );
+          const stock = loc ? Number(loc.quantite) : Number(m.stock_actuel || 0);
+          return { id: m.id, code: m.code, description: m.description, stock };
+        })
+        .filter((m) => m.stock > 0)
+        .sort((a, b) => a.code.localeCompare(b.code));
+      setOrigemMateriais(result);
+    } catch (error) {
+      console.error('Erro ao carregar materiais do depósito de origem:', error);
+      setOrigemMateriais([]);
+    } finally {
+      setLoadingOrigemMateriais(false);
     }
   };
 
   const openCreate = async () => {
     setCreateOpen(true);
     setCreateError(null);
-    setOrigemFluxoTipo('ENTRADA');
-    setSelectedOrigemPedidoId('');
-    setOrigemReferencia('');
+    setSelectedEntrepotOrigemId('');
+    setSelectedEntrepotDestinoId('');
     setObservacao('');
     setDemandeurReelId('');
     setSelectedMaterielId('');
-    setSelectedEntrepotOrigemId('');
-    setSelectedEntrepotDestinoId('');
     setQuantidade('');
     setItems([]);
+    setOrigemMateriais([]);
     await loadCreateDependencies();
   };
-
-  const getPedidoPilier = (p: Pedido): string => {
-    const itemPilier = (p.items || []).find((it) => it.entrepot_pilier)?.entrepot_pilier;
-    return itemPilier || '';
-  };
-
-  const origemOptions = useMemo(() => {
-    return origemPedidos
-      .filter((p) => {
-        if (!p.reference) return false;
-        if (pilierParam && getPedidoPilier(p) !== pilierParam) return false;
-
-        const fluxo = p.formulario?.tipo_fluxo;
-        if (origemFluxoTipo === 'COMPRAS') {
-          return fluxo === 'COMPRAS' && p.statut === 'RECEBIDA';
-        }
-
-        return fluxo === 'ENTRADA' && p.statut === 'RECEBIDA';
-      })
-      .sort((a, b) => new Date(b.date_demande).getTime() - new Date(a.date_demande).getTime());
-  }, [origemPedidos, pilierParam, origemFluxoTipo]);
-
-  const entrepotOptionsTransfer = useMemo(() => {
-    const map = new Map<number, string>();
-    // Base list from API
-    entrepots.forEach((e) => {
-      map.set(Number(e.id), e.nom);
-    });
-    // Ensure entrepots from transfer refs are visible even if API list is restricted by pilier
-    origemOptions.forEach((p) => {
-      const f = p.formulario;
-      if (!f) return;
-      if (typeof f.entrepot_origem === 'number' && f.entrepot_origem_nome) {
-        map.set(Number(f.entrepot_origem), f.entrepot_origem_nome);
-      }
-      if (typeof f.entrepot_destino === 'number' && f.entrepot_destino_nome) {
-        map.set(Number(f.entrepot_destino), f.entrepot_destino_nome);
-      }
-    });
-    return Array.from(map.entries())
-      .map(([id, nom]) => ({ id, nom }))
-      .sort((a, b) => a.nom.localeCompare(b.nom));
-  }, [entrepots, origemOptions]);
-
-  const selectedOrigemPedido = useMemo(
-    () => origemOptions.find((p) => String(p.id) === selectedOrigemPedidoId) || null,
-    [origemOptions, selectedOrigemPedidoId]
-  );
-
-  const origemMateriais = useMemo(() => {
-    const originItems = selectedOrigemPedido?.items || [];
-    if (!originItems.length) return [] as Array<{ id: number; code: string; description: string; origem_qtd: number; origem_base: number }>;
-    return originItems
-      .map((it) => {
-        if (!it.materiel_id) return null;
-        const base = it.quantite_entregue || it.quantite_approuvee || it.quantite_demandee || 0;
-        const disponivel = stockByMaterialOrigem.has(it.materiel_id)
-          ? Number(stockByMaterialOrigem.get(it.materiel_id) ?? 0)
-          : Number(base);
-        return {
-          id: it.materiel_id,
-          code: it.materiel_code,
-          description: it.materiel_description,
-          origem_qtd: disponivel,
-          origem_base: base,
-        };
-      })
-      .filter((x): x is { id: number; code: string; description: string; origem_qtd: number; origem_base: number } =>
-        Boolean(x && x.origem_base > 0)
-      );
-  }, [selectedOrigemPedido, stockByMaterialOrigem]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(rows.length / pageSize)), [rows.length]);
   const pagedRows = useMemo(() => {
@@ -250,26 +186,26 @@ function TransferenciasContent() {
 
   const addItem = () => {
     setCreateError(null);
-    if (!selectedMaterielId || !selectedEntrepotOrigemId || !quantidade) {
-      setCreateError('Selecione material, deposito e quantidade.');
+    if (!selectedMaterielId || !quantidade) {
+      setCreateError('Selecione o material e a quantidade.');
       return;
     }
     const qty = Number(quantidade);
     if (!Number.isFinite(qty) || qty <= 0) {
-      setCreateError('Quantidade inv?lida.');
+      setCreateError('Quantidade inválida.');
       return;
     }
     const material = origemMateriais.find((m) => m.id === Number(selectedMaterielId));
     if (!material) {
-      setCreateError('Selecione um material da transferencia de origem.');
+      setCreateError('Material não encontrado no depósito de origem.');
       return;
     }
     if (items.some((i) => i.materiel_id === material.id)) {
-      setCreateError('Material ja adicionado na entrada.');
+      setCreateError('Material já adicionado.');
       return;
     }
-    if (qty > material.origem_qtd) {
-      setCreateError(`Quantidade excede o estoque disponivel (${material.origem_qtd}) para ${material.code}.`);
+    if (qty > material.stock) {
+      setCreateError(`Quantidade excede o stock disponível (${material.stock}) para ${material.code}.`);
       return;
     }
     setItems((prev) => [
@@ -284,43 +220,26 @@ function TransferenciasContent() {
     ]);
     setSelectedMaterielId('');
     setQuantidade('');
+    setSearchMateriel('');
   };
 
   const removeItem = (id: number) => setItems((prev) => prev.filter((x) => x.materiel_id !== id));
 
   const createTransferencia = async () => {
     setCreateError(null);
-    if (!demandeurReelId) {
-      setCreateError('Selecione o demandante real.');
-      return;
-    }
-    if (!selectedOrigemPedidoId || !origemReferencia.trim()) {
-      setCreateError('Informe a referencia da transferencia de origem.');
-      return;
-    }
-    if (!selectedEntrepotOrigemId) {
-      setCreateError('Deposito de origem da entrada não identificado.');
-      return;
-    }
-    if (!selectedEntrepotDestinoId) {
-      setCreateError('Selecione o deposito de destino da transferencia.');
-      return;
-    }
+    if (!demandeurReelId) { setCreateError('Selecione o demandante real.'); return; }
+    if (!selectedEntrepotOrigemId) { setCreateError('Selecione o depósito de origem.'); return; }
+    if (!selectedEntrepotDestinoId) { setCreateError('Selecione o depósito de destino.'); return; }
     if (Number(selectedEntrepotOrigemId) === Number(selectedEntrepotDestinoId)) {
       setCreateError('Origem e destino não podem ser iguais.');
       return;
     }
-    if (items.length === 0) {
-      setCreateError('Adicione pelo menos um material.');
-      return;
-    }
+    if (items.length === 0) { setCreateError('Adicione pelo menos um material.'); return; }
 
     setCreateLoading(true);
     try {
-      const origemTipo = selectedOrigemPedido?.formulario?.tipo_fluxo || 'ENTRADA';
-      const description = `[ORIGEM_TIPO:${origemTipo}] [ORIGEM_PEDIDO_ID:${selectedOrigemPedidoId}] [ORIGEM_REF:${origemReferencia.trim()}] ${observacao}`.trim();
       const createRes = await api.post('/pedidos/', {
-        description,
+        description: observacao.trim() || undefined,
         demandeur_reel_id: Number(demandeurReelId),
         tipo_fluxo: 'TRANSFERENCIA',
         entrepot_destino_id: Number(selectedEntrepotDestinoId),
@@ -330,18 +249,16 @@ function TransferenciasContent() {
           quantite_demandee: it.quantite_demandee,
         })),
       });
-
       const createdId = createRes.data?.id;
       if (createdId) {
         await api.post(`/pedidos/${createdId}/valider/`);
       }
-
       setCreateOpen(false);
       await loadTransferencias();
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       const data = err?.response?.data;
-      setCreateError(detail || JSON.stringify(data) || 'Erro ao criar transferencia.');
+      setCreateError(detail || JSON.stringify(data) || 'Erro ao criar transferência.');
     } finally {
       setCreateLoading(false);
     }
@@ -356,7 +273,7 @@ function TransferenciasContent() {
   const statusLabel = (s: string) => {
     if (s === 'BROUILLON') return 'Rascunho';
     if (s === 'EN_ATTENTE' || s === 'APPROUVEE') return 'A tratar';
-    if (s === 'ENTREGUE' || s === 'RECEBIDA') return 'Transferencia concluida';
+    if (s === 'ENTREGUE' || s === 'RECEBIDA') return 'Transferência concluída';
     if (s === 'REFUSEE') return 'Recusada';
     return s || '-';
   };
@@ -381,7 +298,7 @@ function TransferenciasContent() {
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       const data = err?.response?.data;
-      setWorkflowError(detail || JSON.stringify(data) || 'Erro ao atualizar transferencia.');
+      setWorkflowError(detail || JSON.stringify(data) || 'Erro ao atualizar transferência.');
     } finally {
       setWorkflowLoading(false);
     }
@@ -397,7 +314,7 @@ function TransferenciasContent() {
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       const data = err?.response?.data;
-      setWorkflowError(detail || JSON.stringify(data) || 'Erro ao confirmar entrada.');
+      setWorkflowError(detail || JSON.stringify(data) || 'Erro ao confirmar transferência.');
     } finally {
       setWorkflowLoading(false);
     }
@@ -405,13 +322,13 @@ function TransferenciasContent() {
 
   return (
     <div className="p-8">
-      <div className="mb-6 flex itemscenter justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-4xl font-bold text-primary">Transferências</h1>
         <button className="btn btn-info" onClick={openCreate}>+ Nova Transferência</button>
       </div>
 
       {loading ? (
-        <div className="flex itemscenter gap-3">
+        <div className="flex items-center gap-3">
           <span className="loading loading-spinner loading-md" />
           <span>Carregando transferências...</span>
         </div>
@@ -424,67 +341,77 @@ function TransferenciasContent() {
               <table className="table table-zebra">
                 <thead>
                   <tr>
-                    <th>Referencia</th>
-                    <th>Tipo Origem</th>
-                    <th>Ref. Origem</th>
+                    <th>Referência</th>
+                    <th>Origem</th>
+                    <th>Destino</th>
                     <th>Data</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedRows.map((p) => {
-                    const origem = parseOrigemMeta(p.description);
-                    return (
-                      <tr key={p.id}>
-                        <td>
-                          <button className="font-semibold text-primary hover:underline" onClick={() => openDetail(p)}>
-                            {p.reference || `#${p.id}`}
-                          </button>
-                        </td>
-                        <td>{origem.tipo}</td>
-                        <td>{origem.referencia}</td>
-                        <td>{new Date(p.date_demande).toLocaleDateString('pt-BR')}</td>
-                        <td>{statusLabel(p.statut)}</td>
-                      </tr>
-                    );
-                  })}
+                  {pagedRows.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <button className="font-semibold text-primary hover:underline" onClick={() => openDetail(p)}>
+                          {p.reference || `#${p.id}`}
+                        </button>
+                      </td>
+                      <td>{p.formulario?.entrepot_origem_nome || '-'}</td>
+                      <td>{p.formulario?.entrepot_destino_nome || '-'}</td>
+                      <td>{new Date(p.date_demande).toLocaleDateString('pt-BR')}</td>
+                      <td>
+                        <span className={`badge ${
+                          p.statut === 'RECEBIDA' || p.statut === 'ENTREGUE' ? 'badge-success' :
+                          p.statut === 'REFUSEE' ? 'badge-error' :
+                          p.statut === 'EN_ATTENTE' || p.statut === 'APPROUVEE' ? 'badge-warning' :
+                          'badge-ghost'
+                        }`}>
+                          {statusLabel(p.statut)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
-            <div className="mt-4 flex itemscenter justify-end gap-2">
-              <button className="btn btn-outline btn-sm" onClick={() => setPage((v) => Math.max(1, v - 1))} disabled={page <= 1}>
-                Anterior
-              </button>
-              <span className="text-sm text-gray-600">{`P?gina ${page} / ${totalPages}`}</span>
-              <button className="btn btn-outline btn-sm" onClick={() => setPage((v) => Math.min(totalPages, v + 1))} disabled={page >= totalPages}>
-                Próxima
-              </button>
-            </div>
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm text-base-content/60">
+                  {rows.length} transferência{rows.length !== 1 ? 's' : ''} · página {page} de {totalPages}
+                </span>
+                <div className="join">
+                  <button className="join-item btn btn-sm" onClick={() => setPage((v) => Math.max(1, v - 1))} disabled={page <= 1}>‹ Anterior</button>
+                  <button className="join-item btn btn-sm btn-active pointer-events-none">{page}</button>
+                  <button className="join-item btn btn-sm" onClick={() => setPage((v) => Math.min(totalPages, v + 1))} disabled={page >= totalPages}>Próxima ›</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
+      {/* DETAIL MODAL */}
       {detailOpen && selectedPedido && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-5xl">
-            <h3 className="text-2xl font-bold mb-4">Detalhes da Transferencia</h3>
+          <div className="modal-box max-w-4xl">
+            <h3 className="text-2xl font-bold mb-4">Detalhes da Transferência</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div><div className="text-gray-500">Referencia</div><div className="font-semibold">{selectedPedido.reference || `#${selectedPedido.id}`}</div></div>
+              <div><div className="text-gray-500">Referência</div><div className="font-semibold">{selectedPedido.reference || `#${selectedPedido.id}`}</div></div>
               <div><div className="text-gray-500">Status</div><div className="font-semibold">{statusLabel(selectedPedido.statut)}</div></div>
               <div><div className="text-gray-500">Data</div><div className="font-semibold">{new Date(selectedPedido.date_demande).toLocaleDateString('pt-BR')}</div></div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-              <div><div className="text-gray-500">Tipo origem</div><div className="font-semibold">{parseOrigemMeta(selectedPedido.description).tipo}</div></div>
-              <div><div className="text-gray-500">Referencia origem</div><div className="font-semibold">{parseOrigemMeta(selectedPedido.description).referencia}</div></div>
+              <div><div className="text-gray-500">Depósito de origem</div><div className="font-semibold">{selectedPedido.formulario?.entrepot_origem_nome || '-'}</div></div>
+              <div><div className="text-gray-500">Depósito de destino</div><div className="font-semibold">{selectedPedido.formulario?.entrepot_destino_nome || '-'}</div></div>
+              {selectedPedido.description && (
+                <div><div className="text-gray-500">Motivo</div><div className="font-semibold">{selectedPedido.description}</div></div>
+              )}
             </div>
 
             <div className="mt-5">
-              <div className="font-semibold mb-2">Materiais da transferencia</div>
+              <div className="font-semibold mb-2">Materiais da transferência</div>
               <div className="overflow-x-auto">
                 <table className="table table-zebra">
-                  <thead><tr><th>Codigo</th><th>Descricao</th><th>Qtd</th></tr></thead>
+                  <thead><tr><th>Código</th><th>Descrição</th><th>Qtd</th></tr></thead>
                   <tbody>
                     {(selectedPedido.items || []).map((it) => (
                       <tr key={it.id}>
@@ -504,7 +431,7 @@ function TransferenciasContent() {
             {workflowError && <div className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{workflowError}</div>}
 
             <div className="modal-action">
-              <Link href={`/dashboard/pedidos/${selectedPedido.id}/formulario`} className="btn btn-outline">Formulario</Link>
+              <Link href={`/dashboard/pedidos/${selectedPedido.id}/formulario`} className="btn btn-outline">Formulário</Link>
               {selectedPedido.statut === 'BROUILLON' && (
                 <button className="btn btn-warning" onClick={markAsTraiter} disabled={workflowLoading}>
                   {workflowLoading ? 'Processando...' : 'Marcar como pendente'}
@@ -512,11 +439,11 @@ function TransferenciasContent() {
               )}
               {(selectedPedido.statut === 'EN_ATTENTE' || selectedPedido.statut === 'APPROUVEE') && (
                 <button className="btn btn-success" onClick={markEntradaFeita} disabled={workflowLoading}>
-                  {workflowLoading ? 'Processando...' : 'Transferencia feita'}
+                  {workflowLoading ? 'Processando...' : 'Transferência feita'}
                 </button>
               )}
               {(selectedPedido.statut === 'ENTREGUE' || selectedPedido.statut === 'RECEBIDA') && (
-                <span className="badge badge-success">Transferencia concluida</span>
+                <span className="badge badge-success badge-lg">Transferência concluída</span>
               )}
               <button className="btn btn-ghost" onClick={() => setDetailOpen(false)} disabled={workflowLoading}>Fechar</button>
             </div>
@@ -524,77 +451,56 @@ function TransferenciasContent() {
         </div>
       )}
 
+      {/* CREATE MODAL */}
       {createOpen && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-5xl">
-            <h3 className="mb-4 text-2xl font-bold">Nova Transferencia</h3>
+          <div className="modal-box max-w-4xl">
+            <h3 className="mb-6 text-2xl font-bold">Nova Transferência</h3>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="label"><span className="label-text">Origem da transferencia</span></label>
+                <label className="label"><span className="label-text font-semibold">Depósito de origem</span></label>
                 <select
                   className="select select-bordered w-full"
-                  value={origemFluxoTipo}
+                  value={selectedEntrepotOrigemId}
                   onChange={(e) => {
-                    const next = e.target.value as 'ENTRADA' | 'COMPRAS';
-                    setOrigemFluxoTipo(next);
-                    setSelectedOrigemPedidoId('');
-                    setOrigemReferencia('');
-                    setSelectedEntrepotOrigemId('');
-                    setSelectedEntrepotDestinoId('');
+                    const id = e.target.value;
+                    setSelectedEntrepotOrigemId(id);
+                                    setSelectedEntrepotDestinoId('');
                     setItems([]);
                     setSelectedMaterielId('');
                     setQuantidade('');
+                    setSearchMateriel('');
+                    if (id) loadMateriaisOrigem(Number(id));
+                    else setOrigemMateriais([]);
                   }}
                 >
-                  <option value="ENTRADA">Entrada</option>
-                  <option value="COMPRAS">Compras</option>
+                  <option value="">Selecione o depósito de origem</option>
+                  {entrepots.map((e) => (
+                    <option key={e.id} value={e.id}>{e.nom}</option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <label className="label"><span className="label-text">Referencia de {origemFluxoTipo === 'COMPRAS' ? 'Compra' : 'Entrada'} (selecione)</span></label>
+                <label className="label"><span className="label-text font-semibold">Depósito de destino</span></label>
                 <select
                   className="select select-bordered w-full"
-                  value={selectedOrigemPedidoId}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSelectedOrigemPedidoId(value);
-                    const selected = origemOptions.find((p) => String(p.id) === value);
-                    setOrigemReferencia(selected?.reference || '');
-                    const origemEntrepotFromForm = selected?.formulario?.entrepot_destino;
-                    const origemEntrepotFromItem = selected?.items?.[0]?.entrepot_id;
-                    const origemEntrepotResolved = origemEntrepotFromForm || origemEntrepotFromItem;
-                    if (origemEntrepotResolved) {
-                      setSelectedEntrepotOrigemId(String(origemEntrepotResolved));
-                    } else {
-                      setSelectedEntrepotOrigemId('');
-                    }
-                    setSelectedEntrepotDestinoId('');
-                    setItems([]);
-                    setSelectedMaterielId('');
-                    setQuantidade('');
-                  }}
+                  value={selectedEntrepotDestinoId}
+                  onChange={(e) => setSelectedEntrepotDestinoId(e.target.value)}
+                  disabled={!selectedEntrepotOrigemId}
                 >
-                  <option value="">{`Selecione ${origemFluxoTipo === 'COMPRAS' ? 'a compra' : 'a entrada'}`}</option>
-                  {origemOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {`${p.reference || `#${p.id}`} - ${origemFluxoTipo === 'COMPRAS' ? 'Compra' : 'Entrada'}`}
-                    </option>
-                  ))}
+                  <option value="">Selecione o depósito de destino</option>
+                  {entrepots
+                    .filter((e) => String(e.id) !== selectedEntrepotOrigemId)
+                    .map((e) => (
+                      <option key={e.id} value={e.id}>{e.nom}</option>
+                    ))}
                 </select>
               </div>
+
               <div>
-                <label className="label"><span className="label-text">Referencia selecionada</span></label>
-                <input
-                  className="input input-bordered w-full"
-                  value={origemReferencia}
-                  readOnly
-                  placeholder="Selecione uma referencia"
-                />
-              </div>
-              <div>
-                <label className="label"><span className="label-text">Demandante real</span></label>
+                <label className="label"><span className="label-text font-semibold">Demandante real</span></label>
                 <select className="select select-bordered w-full" value={demandeurReelId} onChange={(e) => setDemandeurReelId(e.target.value)}>
                   <option value="">Selecione</option>
                   {utilisateursFinal.map((u) => (
@@ -602,92 +508,123 @@ function TransferenciasContent() {
                   ))}
                 </select>
               </div>
+
               <div>
-                <label className="label"><span className="label-text">Deposito de origem da entrada</span></label>
+                <label className="label"><span className="label-text font-semibold">Motivo / Observação</span></label>
                 <input
                   className="input input-bordered w-full"
-                  value={selectedOrigemPedido?.formulario?.entrepot_destino_nome || ''}
-                  readOnly
-                  placeholder="Selecione a entrada de referencia"
-                />
-              </div>
-              <div>
-                <label className="label"><span className="label-text">Deposito de destino da transferencia</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={selectedEntrepotDestinoId}
-                  onChange={(e) => setSelectedEntrepotDestinoId(e.target.value)}
-                >
-                  <option value="">Selecione</option>
-                  {entrepotOptionsTransfer
-                    .filter((e) => String(e.id) !== String(selectedEntrepotOrigemId || ''))
-                    .map((e) => (
-                    <option key={e.id} value={e.id}>{e.nom}</option>
-                  ))}
-                </select>
-                {selectedOrigemPedido?.formulario?.entrepot_destino_nome && (
-                  <div className="mt-1 text-xs text-gray-500">
-                    {`Destino previsto na transferencia: ${selectedOrigemPedido.formulario.entrepot_destino_nome}`}
-                  </div>
-                )}
-              </div>
-              <div className="md:col-span-2">
-                <label className="label"><span className="label-text">Motivo de transferencia</span></label>
-                <textarea
-                  className="textarea textarea-bordered w-full"
-                  rows={2}
+                  placeholder="Motivo da transferência (opcional)"
                   value={observacao}
                   onChange={(e) => setObservacao(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="mt-5 border rounded-lg p-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                <select className="select select-bordered md:col-span-2" value={selectedMaterielId} onChange={(e) => setSelectedMaterielId(e.target.value)}>
-                  <option value="">Material da transferencia</option>
-                  {origemMateriais.map((m) => (
-                    <option key={m.id} value={m.id}>{`${m.code} - ${m.description} (Disponivel: ${m.origem_qtd} | Origem: ${m.origem_base})`}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min="1"
-                  className="input input-bordered"
-                  placeholder="Quantidade"
-                  value={quantidade}
-                  onChange={(e) => setQuantidade(e.target.value)}
-                />
-                <button className="btn btn-outline" type="button" onClick={addItem}>+ Adicionar</button>
-              </div>
-
-              {items.length > 0 && (
-                <div className="mt-4 overflow-x-auto">
-                  <table className="table table-zebra table-sm">
-                    <thead><tr><th>Codigo</th><th>Descricao</th><th>Qtd</th><th></th></tr></thead>
-                    <tbody>
-                      {items.map((it) => (
-                        <tr key={it.materiel_id}>
-                          <td>{it.code}</td>
-                          <td>{it.description}</td>
-                          <td>{it.quantite_demandee}</td>
-                          <td className="text-right">
-                            <button className="btn btn-xs btn-error" onClick={() => removeItem(it.materiel_id)}>Remover</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {selectedEntrepotOrigemId && (
+              <div className="mt-6 border rounded-xl p-4">
+                <div className="font-semibold mb-3 flex items-center gap-2">
+                  Materiais disponíveis no depósito
+                  {loadingOrigemMateriais && <span className="loading loading-spinner loading-xs" />}
                 </div>
-              )}
-            </div>
 
-            {createError && <div className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{createError}</div>}
+                {!loadingOrigemMateriais && origemMateriais.length === 0 && (
+                  <div className="text-sm text-gray-500 py-2">
+                    Nenhum material com stock disponível neste depósito.
+                  </div>
+                )}
+
+                {!loadingOrigemMateriais && origemMateriais.length > 0 && (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      className="input input-bordered w-full"
+                      placeholder="Pesquisar por código ou descrição..."
+                      value={searchMateriel}
+                      onChange={(e) => {
+                        setSearchMateriel(e.target.value);
+                        setSelectedMaterielId('');
+                      }}
+                    />
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                      <select
+                        className="select select-bordered md:col-span-2"
+                        value={selectedMaterielId}
+                        onChange={(e) => setSelectedMaterielId(e.target.value)}
+                        size={1}
+                      >
+                        <option value="">
+                          {searchMateriel
+                            ? `${origemMateriais.filter((m) => {
+                                const term = searchMateriel.toLowerCase();
+                                return (
+                                  !items.some((i) => i.materiel_id === m.id) &&
+                                  (m.code.toLowerCase().includes(term) || m.description.toLowerCase().includes(term))
+                                );
+                              }).length} resultado(s) — selecione`
+                            : 'Selecione o material'}
+                        </option>
+                        {origemMateriais
+                          .filter((m) => {
+                            if (items.some((i) => i.materiel_id === m.id)) return false;
+                            if (!searchMateriel) return true;
+                            const term = searchMateriel.toLowerCase();
+                            return m.code.toLowerCase().includes(term) || m.description.toLowerCase().includes(term);
+                          })
+                          .map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {`${m.code} — ${m.description} (Stock: ${m.stock})`}
+                            </option>
+                          ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="1"
+                        className="input input-bordered"
+                        placeholder="Quantidade"
+                        value={quantidade}
+                        onChange={(e) => setQuantidade(e.target.value)}
+                      />
+                      <button className="btn btn-outline" type="button" onClick={addItem}>
+                        + Adicionar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {items.length > 0 && (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="table table-zebra table-sm">
+                      <thead><tr><th>Código</th><th>Descrição</th><th>Qtd</th><th></th></tr></thead>
+                      <tbody>
+                        {items.map((it) => (
+                          <tr key={it.materiel_id}>
+                            <td className="font-mono font-semibold">{it.code}</td>
+                            <td>{it.description}</td>
+                            <td>{it.quantite_demandee}</td>
+                            <td className="text-right">
+                              <button className="btn btn-xs btn-error" onClick={() => removeItem(it.materiel_id)}>
+                                Remover
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {createError && (
+              <div className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{createError}</div>
+            )}
 
             <div className="modal-action">
-              <button className="btn btn-ghost" onClick={() => setCreateOpen(false)} disabled={createLoading}>Cancelar</button>
+              <button className="btn btn-ghost" onClick={() => setCreateOpen(false)} disabled={createLoading}>
+                Cancelar
+              </button>
               <button className="btn btn-info" onClick={createTransferencia} disabled={createLoading}>
-                {createLoading ? 'Criando...' : 'Criar transferencia'}
+                {createLoading ? 'Criando...' : 'Criar transferência'}
               </button>
             </div>
           </div>

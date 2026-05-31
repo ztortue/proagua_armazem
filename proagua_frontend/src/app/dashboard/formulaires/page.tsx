@@ -149,7 +149,16 @@ export default function FormulairesPage() {
       const data: Pedido[] | PaginatedResponse<Pedido> = res.data;
       const rows: Pedido[] = Array.isArray(data) ? data : data.results || [];
       collected.push(...rows);
-      nextPath = Array.isArray(data) ? null : data.next || null;
+      if (Array.isArray(data) || !data.next) {
+        nextPath = null;
+      } else {
+        try {
+          const u = new URL(data.next);
+          nextPath = u.pathname.replace(/^\/api/, '') + u.search;
+        } catch {
+          nextPath = null;
+        }
+      }
     }
     return collected;
   };
@@ -432,7 +441,7 @@ export default function FormulairesPage() {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-600">
-                    {`P?gina ${comprasPage} / ${comprasTotalPages}`}
+                    {`Página ${comprasPage} / ${comprasTotalPages}`}
                   </span>
                   <button
                     className="btn btn-outline btn-sm"
@@ -471,7 +480,7 @@ export default function FormulairesPage() {
                 <table className="table table-zebra">
                   <thead>
                     <tr>
-                      <th>Referencia</th>
+                      <th>Referência</th>
                       <th>Data</th>
                       <th>Status</th>
                       <th className="w-36">Ações</th>
@@ -570,7 +579,7 @@ export default function FormulairesPage() {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-600">
-                    {`P?gina ${transferenciasPage} / ${transferenciasTotalPages}`}
+                    {`Página ${transferenciasPage} / ${transferenciasTotalPages}`}
                   </span>
                   <button
                     className="btn btn-outline btn-sm"
@@ -656,7 +665,7 @@ export default function FormulairesPage() {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-600">
-                    {`P?gina ${entradasPage} / ${entradasTotalPages}`}
+                    {`Página ${entradasPage} / ${entradasTotalPages}`}
                   </span>
                   <button
                     className="btn btn-outline btn-sm"
@@ -725,7 +734,7 @@ export default function FormulairesPage() {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-600">
-                    {`P?gina ${emprestoPage} / ${emprestoTotalPages}`}
+                    {`Página ${emprestoPage} / ${emprestoTotalPages}`}
                   </span>
                   <button
                     className="btn btn-outline btn-sm"
@@ -794,7 +803,7 @@ export default function FormulairesPage() {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-600">
-                    {`P?gina ${devolucoesPage} / ${devolucoesTotalPages}`}
+                    {`Página ${devolucoesPage} / ${devolucoesTotalPages}`}
                   </span>
                   <button
                     className="btn btn-outline btn-sm"

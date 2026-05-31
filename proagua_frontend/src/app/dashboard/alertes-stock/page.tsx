@@ -141,7 +141,7 @@ function AlertesStockContent() {
           ))}
         </select>
         <div className="flex itemscenter justify-end text-sm text-gray-600">
-          {`P?gina ${page} / ${totalPages} - Total ${filtered.length}`}
+          {`Página ${page} / ${totalPages} - Total ${filtered.length}`}
         </div>
       </div>
 
@@ -150,7 +150,7 @@ function AlertesStockContent() {
           <thead>
             <tr>
               <th>Codigo</th>
-              <th>Descricao</th>
+              <th>Descrição</th>
               <th>Estoque Atual</th>
               <th>Estoque Minimo</th>
               <th>Deficit</th>

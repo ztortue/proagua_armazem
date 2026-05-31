@@ -55,7 +55,7 @@ function MateriaisContent() {
   const toRelativeApiPath = (nextUrl: string) => {
     try {
       const url = new URL(nextUrl);
-      return url.pathname + url.search;
+      return url.pathname.replace(/^\/api/, '') + url.search;
     } catch {
       return nextUrl;
     }

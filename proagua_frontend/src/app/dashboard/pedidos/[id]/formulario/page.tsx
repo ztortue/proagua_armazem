@@ -619,7 +619,7 @@ export default function PedidoFormularioPage() {
                     <th>REF ITEM</th>
                     <th>DESIGNACAO</th>
                     <th>QTDE SOLIC.</th>
-                    <th>DATA NECESARIA</th>
+                    <th>DATA NECESSÁRIA</th>
                     <th>COMENTARIO</th>
                   </tr>
                 </thead>
@@ -732,7 +732,7 @@ export default function PedidoFormularioPage() {
                   <th style={{ width: '16%' }}>REF ITEM</th>
                   <th style={{ width: '42%' }}>DESIGNACAO</th>
                   <th style={{ width: '12%' }}>QTDE SOLIC.</th>
-                  <th style={{ width: '15%' }}>DATA NECESARIA</th>
+                  <th style={{ width: '15%' }}>DATA NECESSÁRIA</th>
                   <th style={{ width: '15%' }}>COMENTARIO</th>
                 </tr>
               </thead>

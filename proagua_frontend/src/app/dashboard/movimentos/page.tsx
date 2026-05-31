@@ -442,7 +442,7 @@ function MovimentosContent() {
       </div>
 
       <div className="mb-3 flex itemscenter justify-between text-sm text-gray-600">
-        <span>{`P?gina ${page} / ${totalPages} - Total ${filteredMovimentos.length}`}</span>
+        <span>{`Página ${page} / ${totalPages} - Total ${filteredMovimentos.length}`}</span>
         <div className="flex itemscenter gap-2">
           <button
             className="btn btn-outline btn-sm"

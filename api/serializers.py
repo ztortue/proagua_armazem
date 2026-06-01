@@ -473,90 +473,10 @@ class DemandeLotCreateSerializer(serializers.ModelSerializer):
         if tipo_fluxo == 'TRANSFERENCIA' and not entrepot_destino:
             raise serializers.ValidationError({'entrepot_destino_id': 'Selecione o depósito de destino para transferência.'})
         if tipo_fluxo == 'TRANSFERENCIA':
-            marker_tipo = '[ORIGEM_TIPO:'
-            marker_id = '[ORIGEM_PEDIDO_ID:'
-            if marker_tipo not in description or marker_id not in description:
-                raise serializers.ValidationError({
-                    'description': 'Transferencia exige metadados de origem: ORIGEM_TIPO e ORIGEM_PEDIDO_ID.'
-                })
-
-            start_tipo = description.find(marker_tipo) + len(marker_tipo)
-            end_tipo = description.find(']', start_tipo)
-            origem_tipo = description[start_tipo:end_tipo].strip().upper() if end_tipo > start_tipo else ''
-
-            start_id = description.find(marker_id) + len(marker_id)
-            end_id = description.find(']', start_id)
-            origem_id_raw = description[start_id:end_id].strip() if end_id > start_id else ''
-            if not origem_id_raw.isdigit():
-                raise serializers.ValidationError({'description': 'ORIGEM_PEDIDO_ID invalido para transferencia.'})
-
-            if origem_tipo not in ['ENTRADA', 'COMPRAS']:
-                raise serializers.ValidationError({
-                    'description': 'Transferencia deve referenciar origem do tipo ENTRADA ou COMPRAS.'
-                })
-
-            origem_pedido = (
-                DemandeLot.objects
-                .select_related('formulario')
-                .prefetch_related('items')
-                .filter(id=int(origem_id_raw))
-                .first()
-            )
-            if not origem_pedido:
-                raise serializers.ValidationError({'description': 'Operação de origem não encontrada para transferencia.'})
-
-            origem_flux = (getattr(origem_pedido, 'formulario', None) and origem_pedido.formulario.tipo_fluxo) or None
-            if origem_flux != origem_tipo:
-                raise serializers.ValidationError({
-                    'description': 'Tipo da operação de origem não corresponde ao tipo informado na transferencia.'
-                })
-
-            if origem_tipo == 'COMPRAS':
-                # Robustesse metier: compras so podem originar transferencia apos recebimento final.
-                if origem_pedido.statut != 'RECEBIDA':
-                    raise serializers.ValidationError({
-                        'description': 'Transferencia a partir de compra exige operação de origem RECEBIDA.'
-                    })
-            else:
-                if origem_pedido.statut != 'RECEBIDA':
-                    raise serializers.ValidationError({
-                        'description': 'Transferencia a partir de entrada exige operação de origem RECEBIDA.'
-                    })
-
-            origem_form = getattr(origem_pedido, 'formulario', None)
-            origem_entrepot = getattr(origem_form, 'entrepot_destino', None)
-            if not origem_entrepot:
-                raise serializers.ValidationError({
-                    'description': 'Deposito de origem não definido na operação referenciada.'
-                })
-
-            origem_items = {it.materiel_id: it for it in origem_pedido.items.all()}
             for item_data in items_data:
-                mat = item_data.get('materiel')
-                if not mat:
-                    continue
-                origem_item = origem_items.get(mat.id)
-                if not origem_item:
+                if not item_data.get('entrepot'):
                     raise serializers.ValidationError({
-                        'items': f'Material {mat.code} não pertence a operação de origem selecionada.'
-                    })
-
-                requested_qty = int(item_data.get('quantite_demandee') or 0)
-                if origem_tipo == 'COMPRAS':
-                    origem_qty = int(origem_item.quantite_entregue or 0)
-                else:
-                    origem_qty = int(
-                        origem_item.quantite_entregue
-                        or origem_item.quantite_approuvee
-                        or origem_item.quantite_demandee
-                        or 0
-                    )
-                if requested_qty > origem_qty:
-                    raise serializers.ValidationError({
-                        'items': (
-                            f'Quantidade solicitada para {mat.code} excede origem '
-                            f'({requested_qty} > {origem_qty}).'
-                        )
+                        'items': 'Cada item da transferência deve ter um depósito de origem.'
                     })
         if tipo_fluxo == 'DEVOLUCAO':
             marker_tipo = '[ORIGEM_TIPO:'
@@ -678,22 +598,6 @@ class DemandeLotCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'items': 'Deposito de retorno deve corresponder ao deposito esperado da operação de origem.'
                 })
-        if tipo_fluxo == 'TRANSFERENCIA':
-            marker_id = '[ORIGEM_PEDIDO_ID:'
-            if marker_id in description:
-                start_id = description.find(marker_id) + len(marker_id)
-                end_id = description.find(']', start_id)
-                origem_id_raw = description[start_id:end_id].strip() if end_id > start_id else ''
-                if origem_id_raw.isdigit():
-                    origem_pedido_check = (
-                        DemandeLot.objects.select_related('formulario')
-                        .filter(id=int(origem_id_raw)).first()
-                    )
-                    origem_entrepot = getattr(getattr(origem_pedido_check, 'formulario', None), 'entrepot_destino', None)
-                    if origem_entrepot and entrepot_origem and origem_entrepot.id != entrepot_origem.id:
-                        raise serializers.ValidationError({
-                            'items': 'Deposito de origem dos itens deve corresponder ao deposito da referencia de origem.'
-                        })
         if tipo_fluxo == 'TRANSFERENCIA' and entrepot_origem and entrepot_destino and entrepot_origem.id == entrepot_destino.id:
             raise serializers.ValidationError({'entrepot_destino_id': 'Origem e destino não podem ser iguais na transferência.'})
         demande = DemandeLot.objects.create(**validated_data)

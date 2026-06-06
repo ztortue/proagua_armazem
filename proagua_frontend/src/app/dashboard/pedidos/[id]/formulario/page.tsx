@@ -190,11 +190,7 @@ export default function PedidoFormularioPage() {
 
   const solicitadoPorDisplay = useMemo(() => {
     if (!formulario) return '-';
-    const isSaida = formulario.tipo_fluxo === 'INSTALACAO';
-    if (isSaida) {
-      return pedido?.demandeur_reel?.entreprise || formulario.solicitado_por_nome || '-';
-    }
-    return formulario.solicitado_por_nome || '-';
+    return pedido?.demandeur_reel?.entreprise || formulario.solicitado_por_nome || '-';
   }, [formulario, pedido?.demandeur_reel?.entreprise]);
 
   const saveValidationMessage = useMemo(() => {

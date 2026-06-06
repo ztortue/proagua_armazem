@@ -120,6 +120,7 @@ function MateriaisContent() {
     type_materiau: '',
     usage_typique: '',
     usage_type: 'INSTALL',
+    stock_inicial: '',
     stock_min: '0',
     stock_max: '',
     prix_unitaire: '0',
@@ -151,6 +152,12 @@ function MateriaisContent() {
   const [selectedViewEntrepotId, setSelectedViewEntrepotId] = useState('');
   const [effectivePilier, setEffectivePilier] = useState<'PILAR1' | 'PILAR2' | 'PILAR3' | null>(null);
   const [hasAllPilierAccess, setHasAllPilierAccess] = useState(false);
+  const [userRole, setUserRole] = useState('');
+  const [mergeModalOpen, setMergeModalOpen] = useState(false);
+  const [mergePreview, setMergePreview] = useState<any>(null);
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [mergeMasterId, setMergeMasterId] = useState<number | null>(null);
   const [pilierResolved, setPilierResolved] = useState(false);
   const isValidPilier = (value: string | null | undefined): value is 'PILAR1' | 'PILAR2' | 'PILAR3' =>
     value === 'PILAR1' || value === 'PILAR2' || value === 'PILAR3';
@@ -182,6 +189,7 @@ function MateriaisContent() {
         const meRes = await api.get('/me/');
         const mePilier = meRes.data?.pilier_affectation;
         const meRole = String(meRes.data?.role || '').toUpperCase();
+        setUserRole(meRole);
         const allAccess = meRole === 'ADMIN' || mePilier === 'TODOS';
         setHasAllPilierAccess(allAccess);
 
@@ -537,6 +545,51 @@ function MateriaisContent() {
   // FIX #1 : Photo opsyonèl — retire blòk ki te bloke soumisyon
   // FIX #2 : FormData voye san headers manyèl — kite axios +
   //           intercepteur api.ts jere Content-Type + boundary
+  const handleMergeOpen = async () => {
+    if (selectedItems.length !== 2) return;
+    const [a, b] = selectedItems;
+    setMergeMasterId(a.id);
+    setMergeError(null);
+    setMergePreview(null);
+    setMergeLoading(true);
+    setMergeModalOpen(true);
+    try {
+      const res = await api.post(`/materiais/${a.id}/merge/`, {
+        merge_with_id: b.id,
+        preview: true,
+      });
+      setMergePreview(res.data);
+    } catch (err: any) {
+      setMergeError(err?.response?.data?.detail || 'Erro ao carregar prévia da fusão.');
+    } finally {
+      setMergeLoading(false);
+    }
+  };
+
+  const handleMergeConfirm = async () => {
+    if (!mergePreview || mergeMasterId === null) return;
+    const toDeleteId = mergeMasterId === mergePreview.master.id
+      ? mergePreview.to_delete.id
+      : mergePreview.master.id;
+    setMergeLoading(true);
+    setMergeError(null);
+    try {
+      const res = await api.post(`/materiais/${mergeMasterId}/merge/`, {
+        merge_with_id: toDeleteId,
+      });
+      setMergeModalOpen(false);
+      setMergePreview(null);
+      setSelectedItems([]);
+      alert(res.data.message);
+      setRefreshKey((k) => k + 1);
+      await loadAllMaterialCodes();
+    } catch (err: any) {
+      setMergeError(err?.response?.data?.detail || 'Erro ao realizar a fusão.');
+    } finally {
+      setMergeLoading(false);
+    }
+  };
+
   // FIX #3 : Erè API afiche pa champ pou dyagnostik pi fasil
   // ============================================================
   const handleCreateMaterial = async () => {
@@ -562,6 +615,7 @@ function MateriaisContent() {
       unite: nouveauMateriel.unite,
       usage_type: nouveauMateriel.usage_type,
       stock_min: Number(nouveauMateriel.stock_min || 0),
+      ...(nouveauMateriel.stock_inicial !== '' && { stock_inicial: Number(nouveauMateriel.stock_inicial) }),
       prix_unitaire: Number(nouveauMateriel.prix_unitaire || 0),
     };
 
@@ -618,6 +672,7 @@ function MateriaisContent() {
         type_materiau: '',
         usage_typique: '',
         usage_type: 'INSTALL',
+        stock_inicial: '',
         stock_min: '0',
         stock_max: '',
         prix_unitaire: '0',
@@ -752,6 +807,14 @@ function MateriaisContent() {
           >
             + Novo Material
           </button>
+          {userRole === 'ADMIN' && selectedItems.length === 2 && (
+            <button
+              onClick={handleMergeOpen}
+              className="btn btn-warning btn-lg"
+            >
+              ⚡ Fusionar 2 Materiais
+            </button>
+          )}
           <button
             onClick={() => setModalOpen(true)}
             className="btn btn-primary btn-lg"
@@ -874,8 +937,8 @@ function MateriaisContent() {
               </th>
               <th>Codigo</th>
               <th>Descricao</th>
+              <th>Stock Inicial</th>
               <th>Stock Atual</th>
-              <th>Stock Min</th>
               <th>Foto</th>
             </tr>
           </thead>
@@ -904,12 +967,14 @@ function MateriaisContent() {
                     </div>
                   )}
                 </td>
+                <td className="text-center font-mono">
+                  {m.stock_inicial ?? '-'}
+                </td>
                 <td>
                   <span className={`badge ${m.stock_actuel < m.stock_min ? 'badge-error' : 'badge-success'} badge-lg`}>
                     {m.stock_actuel || 0}
                   </span>
                 </td>
-                <td>{m.stock_min}</td>
                 <td>
                   {m.photo ? (
                     <img
@@ -958,6 +1023,129 @@ function MateriaisContent() {
               </button>
               <button className="btn btn-primary" onClick={handleUploadMaterialPhoto} disabled={!photoUploadFile || uploadingPhoto}>
                 {uploadingPhoto ? 'A guardar...' : 'Guardar foto'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL FUSIONAR MATERIAIS */}
+      {mergeModalOpen && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-3xl">
+            <h3 className="font-bold text-2xl mb-2 text-warning">⚡ Fusionar Materiais</h3>
+            <p className="text-sm opacity-70 mb-6">
+              O material selecionado como <strong>Master</strong> será mantido. O outro será eliminado permanentemente e o seu stock somado ao do Master.
+            </p>
+
+            {mergeLoading && (
+              <div className="flex justify-center py-8">
+                <span className="loading loading-spinner loading-lg" />
+              </div>
+            )}
+
+            {mergeError && (
+              <div className="alert alert-error mb-4">
+                <span>{mergeError}</span>
+              </div>
+            )}
+
+            {mergePreview && !mergeLoading && (
+              <>
+                {/* Avisos */}
+                {mergePreview.warnings.length > 0 && (
+                  <div className="space-y-2 mb-6">
+                    {mergePreview.warnings.map((w: any, i: number) => (
+                      <div key={i} className={`alert ${w.level === 'GRAVE' ? 'alert-error' : 'alert-warning'}`}>
+                        <span>{w.level === 'GRAVE' ? '🔴' : '🟠'} {w.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Tabela comparação */}
+                <div className="overflow-x-auto mb-6">
+                  <table className="table table-zebra border rounded-xl">
+                    <thead className="bg-base-200">
+                      <tr>
+                        <th>Campo</th>
+                        <th>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="merge-master"
+                              className="radio radio-warning"
+                              checked={mergeMasterId === mergePreview.master.id}
+                              onChange={() => setMergeMasterId(mergePreview.master.id)}
+                            />
+                            <span>{mergePreview.master.code}</span>
+                          </label>
+                        </th>
+                        <th>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="merge-master"
+                              className="radio radio-warning"
+                              checked={mergeMasterId === mergePreview.to_delete.id}
+                              onChange={() => setMergeMasterId(mergePreview.to_delete.id)}
+                            />
+                            <span>{mergePreview.to_delete.code}</span>
+                          </label>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: 'Código', ka: mergePreview.master.code, kb: mergePreview.to_delete.code },
+                        { label: 'Descrição', ka: mergePreview.master.description, kb: mergePreview.to_delete.description },
+                        { label: 'Família', ka: mergePreview.master.famille, kb: mergePreview.to_delete.famille },
+                        { label: 'Categoria', ka: mergePreview.master.categorie, kb: mergePreview.to_delete.categorie },
+                        { label: 'Unidade', ka: mergePreview.master.unite, kb: mergePreview.to_delete.unite },
+                        { label: 'Stock atual', ka: mergePreview.master.stock_actuel, kb: mergePreview.to_delete.stock_actuel },
+                      ].map((row) => (
+                        <tr key={row.label}>
+                          <td className="font-semibold opacity-70">{row.label}</td>
+                          <td className={mergeMasterId === mergePreview.master.id ? 'font-bold text-success' : ''}>
+                            {String(row.ka ?? '-')}
+                            {mergeMasterId === mergePreview.master.id && <span className="ml-2 badge badge-success badge-sm">✓ mantido</span>}
+                          </td>
+                          <td className={mergeMasterId === mergePreview.to_delete.id ? 'font-bold text-success' : ''}>
+                            {String(row.kb ?? '-')}
+                            {mergeMasterId === mergePreview.to_delete.id && <span className="ml-2 badge badge-success badge-sm">✓ mantido</span>}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-base-200 font-bold">
+                        <td>Stock após fusão</td>
+                        <td colSpan={2} className="text-center text-lg text-primary">
+                          {mergePreview.stock_after_merge}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="alert alert-error mb-4">
+                  <span>⚠️ Esta operação é <strong>irreversível</strong>. O material eliminado não poderá ser recuperado.</span>
+                </div>
+              </>
+            )}
+
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => { setMergeModalOpen(false); setMergePreview(null); setMergeError(null); }}
+                disabled={mergeLoading}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleMergeConfirm}
+                disabled={mergeLoading || !mergePreview || mergeMasterId === null}
+              >
+                {mergeLoading ? 'A fusionar...' : 'Confirmar Fusão'}
               </button>
             </div>
           </div>
@@ -1048,6 +1236,11 @@ function MateriaisContent() {
                     <option key={u.id} value={u.nom}>{u.nom}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="label"><span className="label-text font-bold">Stock Inicial <span className="font-normal text-gray-400">(opcional)</span></span></label>
+                <input type="number" min="0" className="input input-bordered w-full" placeholder="Quantidade em stock ao registar" value={nouveauMateriel.stock_inicial ?? ''} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, stock_inicial: e.target.value }))} />
               </div>
 
               <div>

@@ -210,7 +210,7 @@ class MaterielSerializer(serializers.ModelSerializer):
             'fournisseur', 'fournisseur_id', 'fournisseur_nom', 'fournisseurs_possibles',
             'entrepot_principal', 'entrepot_principal_id',
             'souscategorie', 'souscategorie_id',
-            'stock_min', 'stock_max', 'prix_unitaire',
+            'stock_inicial', 'stock_min', 'stock_max', 'prix_unitaire',
             'diametre_nominal', 'pression_nominal', 'type_materiau', 'usage_typique',
             'usage_type',
             'photo', 'stock_locations', 'stock_actuel',

@@ -362,6 +362,7 @@ class Materiel(models.Model):
     code = models.CharField("Código", max_length=50, unique=True, db_index=True, blank=True)
     description = models.TextField("Descrição")
     unite = models.CharField("Unidade", max_length=20, choices=UNITE_CHOICES)  # ex: un, kg, m, litro...
+    stock_inicial = models.PositiveIntegerField("Stock Inicial", null=True, blank=True)
     stock_min = models.PositiveIntegerField("Estoque Mínimo", default=0)
     stock_max = models.PositiveIntegerField("Estoque Máximo", null=True, blank=True)
     prix_unitaire = models.DecimalField( 
@@ -671,6 +672,7 @@ class DemandeLot(models.Model):
         ('REFUSEE', 'Recusada'),
         ('ENTREGUE', 'Entregue'),
         ('RECEBIDA', 'Recebida'),
+        ('ANNULE', 'Cancelada'),
     )
 
     demandeur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='demandes')

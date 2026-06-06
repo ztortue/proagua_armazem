@@ -19,7 +19,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from .models import (
     Famille, Materiel, MaterielFournisseur, StockEntrepot, Mouvement, DemandeLot, DemandeItem, PedidoFormulario,
     RecebimentoHistorico,
-    ProjetChantier, Utilisateur, UtilisateurFinal, UsoTipico, Categorie, SousCategorie, Fournisseur, Entrepot, Notification, AuditLog
+    ProjetChantier, Utilisateur, UtilisateurFinal, UsoTipico, Categorie, SousCategorie, Fournisseur, Entrepot, Notification, AuditLog,
+    RapportMouvman, CommandeItem,
 )
 from .serializers import (
     FamilleSerializer, MaterielSerializer, StockEntrepotSerializer, MouvementSerializer,
@@ -176,6 +177,174 @@ class MaterielViewSet(viewsets.ModelViewSet):
             changes='Criacao de material.',
         )
         return materiel
+
+    @action(detail=True, methods=['post'], url_path='merge')
+    def merge(self, request, pk=None):
+        """
+        Fuzyone 2 materyèl an 1 sèl (ADMIN sèlman).
+        POST /api/materiais/{id}/merge/
+          { "merge_with_id": <int>, "preview": true|false }
+
+        Si preview=true → retounen avètisman san fè aksyon.
+        Si preview=false (defò) → fè fizyon an.
+        """
+        if request.user.role != 'ADMIN':
+            return Response(
+                {'detail': 'Apenas ADMIN pode fusionar materiais.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        master = self.get_object()  # materyèl ki rete (A)
+        merge_with_id = request.data.get('merge_with_id')
+        preview = request.data.get('preview', False)
+
+        if not merge_with_id:
+            return Response(
+                {'detail': 'merge_with_id é obrigatório.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            to_delete = Materiel.objects.get(pk=int(merge_with_id))
+        except (Materiel.DoesNotExist, ValueError):
+            return Response(
+                {'detail': 'Material a fusionar não encontrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if master.pk == to_delete.pk:
+            return Response(
+                {'detail': 'Não é possível fusionar um material com ele mesmo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Kalkile avètisman ──────────────────────────────────────────────
+        warnings = []
+        if master.unite != to_delete.unite:
+            warnings.append({
+                'level': 'GRAVE',
+                'message': f'Unidades diferentes: "{master.unite}" vs "{to_delete.unite}". '
+                           f'Os stocks não são compatíveis.',
+            })
+        if master.categorie_id != to_delete.categorie_id:
+            warnings.append({
+                'level': 'ATENCAO',
+                'message': f'Categorias diferentes: '
+                           f'"{master.categorie.nom if master.categorie else "-"}" vs '
+                           f'"{to_delete.categorie.nom if to_delete.categorie else "-"}".',
+            })
+        if (master.categorie and to_delete.categorie and
+                master.categorie.famille_id != to_delete.categorie.famille_id):
+            warnings.append({
+                'level': 'GRAVE',
+                'message': 'Famílias diferentes — estes materiais provavelmente não são equivalentes.',
+            })
+        if master.diametre_nominal and to_delete.diametre_nominal:
+            if master.diametre_nominal != to_delete.diametre_nominal:
+                warnings.append({
+                    'level': 'ATENCAO',
+                    'message': f'Diâmetro nominal diferente: {master.diametre_nominal}mm vs '
+                               f'{to_delete.diametre_nominal}mm.',
+                })
+
+        stock_master = StockEntrepot.objects.filter(materiel=master).aggregate(
+            total=Sum('quantite'))['total'] or 0
+        stock_delete = StockEntrepot.objects.filter(materiel=to_delete).aggregate(
+            total=Sum('quantite'))['total'] or 0
+
+        if preview:
+            return Response({
+                'master': {
+                    'id': master.pk,
+                    'code': master.code,
+                    'description': master.description,
+                    'unite': master.unite,
+                    'stock_actuel': stock_master,
+                    'categorie': master.categorie.nom if master.categorie else '-',
+                    'famille': (master.categorie.famille.nom
+                                if master.categorie and master.categorie.famille else '-'),
+                },
+                'to_delete': {
+                    'id': to_delete.pk,
+                    'code': to_delete.code,
+                    'description': to_delete.description,
+                    'unite': to_delete.unite,
+                    'stock_actuel': stock_delete,
+                    'categorie': to_delete.categorie.nom if to_delete.categorie else '-',
+                    'famille': (to_delete.categorie.famille.nom
+                                if to_delete.categorie and to_delete.categorie.famille else '-'),
+                },
+                'stock_after_merge': stock_master + stock_delete,
+                'warnings': warnings,
+            })
+
+        # ── Fizyon reyèl (nan yon sèl tranzaksyon) ────────────────────────
+        with transaction.atomic():
+            # 1. Stock — adisyone kantite pou chak depo
+            for stock_b in StockEntrepot.objects.filter(materiel=to_delete):
+                stock_a = StockEntrepot.objects.filter(
+                    materiel=master, entrepot=stock_b.entrepot
+                ).first()
+                if stock_a:
+                    StockEntrepot.objects.filter(pk=stock_a.pk).update(
+                        quantite=F('quantite') + stock_b.quantite
+                    )
+                    stock_b.delete()
+                else:
+                    stock_b.materiel = master
+                    stock_b.save(update_fields=['materiel'])
+
+            # 2. Mouvements
+            Mouvement.objects.filter(materiel=to_delete).update(materiel=master)
+
+            # 3. Items pedido
+            DemandeItem.objects.filter(materiel=to_delete).update(materiel=master)
+
+            # 4. Fournisseurs — evite doublons UNIQUE(materiel, fournisseur)
+            fournisseur_ids_master = set(
+                MaterielFournisseur.objects.filter(materiel=master)
+                .values_list('fournisseur_id', flat=True)
+            )
+            for link in MaterielFournisseur.objects.filter(materiel=to_delete):
+                if link.fournisseur_id not in fournisseur_ids_master:
+                    link.materiel = master
+                    link.save(update_fields=['materiel'])
+                else:
+                    link.delete()
+
+            # 5. Rapports mouvements
+            RapportMouvman.objects.filter(materiel=to_delete).update(materiel=master)
+
+            # 6. Commandes
+            CommandeItem.objects.filter(materiel=to_delete).update(materiel=master)
+
+            # 7. Efase B
+            deleted_code = to_delete.code
+            deleted_desc = to_delete.description
+            to_delete.delete()
+
+        # ── Audit log (deyò tranzaksyon) ───────────────────────────────────
+        _audit_log(
+            request.user,
+            'UPDATE',
+            'MATERIAIS',
+            obj=master,
+            changes=(
+                f'Fusão: material "{deleted_code}" ({deleted_desc}) '
+                f'foi fundido neste material. '
+                f'Stock combinado: {stock_master + stock_delete}.'
+            ),
+        )
+
+        return Response({
+            'message': f'Material "{deleted_code}" fusionado com sucesso em "{master.code}".',
+            'master': {
+                'id': master.pk,
+                'code': master.code,
+                'description': master.description,
+                'stock_after_merge': stock_master + stock_delete,
+            },
+        }, status=status.HTTP_200_OK)
 
     def perform_update(self, serializer):
         materiel = serializer.save(updated_by=self.request.user)
@@ -693,6 +862,90 @@ class DemandeLotViewSet(viewsets.ModelViewSet):
         )
         return Response(RecebimentoHistoricoSerializer(qs, many=True).data)
 
+
+    @action(detail=True, methods=['patch'], url_path='modifier')
+    def modifier(self, request, pk=None):
+        """
+        Modifye deskripsyon + kantite items yo — tout moun otantifye, nenpòt estati.
+        PATCH /api/pedidos/{id}/modifier/
+        { "description": "...", "items": [{"id": 1, "quantite_demandee": 5}, ...] }
+        """
+        demande = self.get_object()
+        user = request.user
+        changes = []
+
+        # Modifye deskripsyon
+        new_description = request.data.get('description')
+        if new_description is not None and new_description != (demande.description or ''):
+            changes.append(f'Descrição: "{demande.description or ""}" → "{new_description}"')
+            demande.description = new_description
+
+        # Modifye kantite items yo
+        items_data = request.data.get('items', [])
+        for item_update in items_data:
+            item_id = item_update.get('id')
+            new_qty = item_update.get('quantite_demandee')
+            if item_id is None or new_qty is None:
+                continue
+            try:
+                item = demande.items.select_related('materiel').get(pk=int(item_id))
+                old_qty = item.quantite_demandee
+                new_qty_int = max(1, int(new_qty))
+                if new_qty_int != old_qty:
+                    changes.append(
+                        f'{item.materiel.code}: {old_qty} → {new_qty_int}'
+                    )
+                    item.quantite_demandee = new_qty_int
+                    item.save(update_fields=['quantite_demandee'])
+            except (DemandeItem.DoesNotExist, ValueError):
+                continue
+
+        demande.updated_by = user
+        demande.save(update_fields=['description', 'updated_by', 'updated_at'])
+
+        if changes:
+            _audit_log(
+                user,
+                'UPDATE',
+                'PEDIDOS',
+                obj=demande,
+                changes='Modificação manual: ' + ' | '.join(changes),
+            )
+
+        serializer = DemandeLotSerializer(demande, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='annuler')
+    def annuler(self, request, pk=None):
+        demande = self.get_object()
+
+        if demande.statut != 'BROUILLON':
+            return Response(
+                {'detail': 'Apenas operações em Rascunho podem ser canceladas.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # USER só pode cancelar os seus próprios pedidos
+        user = request.user
+        role = getattr(user, 'role', 'USER')
+        if role not in ('ADMIN', 'MANAGER') and demande.demandeur_id != user.id:
+            return Response(
+                {'detail': 'Não tem permissão para cancelar esta operação.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        demande.statut = 'ANNULE'
+        demande.save(update_fields=['statut'])
+
+        _audit_log(
+            user,
+            'UPDATE',
+            'PEDIDOS',
+            obj=demande,
+            changes=f'Operação cancelada pelo utilizador (era BROUILLON).',
+        )
+
+        return Response({'detail': 'Operação cancelada com sucesso.'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='valider')
     def valider(self, request, pk=None):

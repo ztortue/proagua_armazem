@@ -96,6 +96,10 @@ function PedidosContent() {
   const [configReady, setConfigReady] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editDescription, setEditDescription] = useState('');
+  const [editQuantities, setEditQuantities] = useState<Record<number, number>>({});
+  const [editSaving, setEditSaving] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportMode, setExportMode] = useState<'single' | 'range'>('single');
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
@@ -304,6 +308,17 @@ function PedidosContent() {
   };
 
 
+
+  const handleAnnuler = async (id: number) => {
+    if (!confirm('Tem certeza que deseja cancelar esta operação? Esta ação não pode ser desfeita.')) return;
+    try {
+      await api.post(`/pedidos/${id}/annuler/`);
+      alert('Operação cancelada com sucesso.');
+      loadPedidos(page);
+    } catch (err: any) {
+      alert('Erro: ' + (err.response?.data?.detail || 'Erro desconhecido'));
+    }
+  };
 
   const handleValider = async (id: number) => {
     if (!confirm('Tem certeza que deseje validar este operaçãoe Ele passara para "Pendente".')) return;
@@ -526,6 +541,37 @@ function PedidosContent() {
   const openDetails = (pedido: Pedido) => {
     setSelectedPedido(pedido);
     setDetailModalOpen(true);
+    setEditMode(false);
+  };
+
+  const openEditMode = () => {
+    if (!selectedPedido) return;
+    setEditDescription(selectedPedido.description || '');
+    const qtds: Record<number, number> = {};
+    selectedPedido.items.forEach((item) => { qtds[item.id] = item.quantite_demandee; });
+    setEditQuantities(qtds);
+    setEditMode(true);
+  };
+
+  const handleSaveModification = async () => {
+    if (!selectedPedido) return;
+    setEditSaving(true);
+    try {
+      const res = await api.patch(`/pedidos/${selectedPedido.id}/modifier/`, {
+        description: editDescription,
+        items: selectedPedido.items.map((item) => ({
+          id: item.id,
+          quantite_demandee: editQuantities[item.id] ?? item.quantite_demandee,
+        })),
+      });
+      setSelectedPedido(res.data);
+      setEditMode(false);
+      loadPedidos(page);
+    } catch (err: any) {
+      alert('Erro ao guardar: ' + (err.response?.data?.detail || 'Erro desconhecido'));
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const formatProjeto = (projet: Pedido['projet'], items: Pedido['items']) => {
@@ -640,6 +686,7 @@ function PedidosContent() {
     if (pedido.statut === 'APPROUVEE') return 'Aprovado';
     if (pedido.statut === 'ENTREGUE') return fluxo === 'ENTRADA' ? 'Recebida' : 'Entregue';
     if (pedido.statut === 'RECEBIDA') return 'Recebida';
+    if (pedido.statut === 'ANNULE') return 'Cancelada';
     return 'Recusado';
   };
 
@@ -984,6 +1031,7 @@ function PedidosContent() {
                       p.statut === 'APPROUVEE' ? 'badge-info' :
                       p.statut === 'ENTREGUE' ? 'badge-success' :
                       p.statut === 'RECEBIDA' ? 'badge-primary' :
+                      p.statut === 'ANNULE' ? 'badge-neutral' :
                       'badge-error'
                     }`}>
                       {getPedidoStatusLabel(p)}
@@ -1006,15 +1054,24 @@ function PedidosContent() {
                 </td>
                 <td>
                   <div className="flex gap-2">
-                    {/* BROUILLON -> Validar */}
+                    {/* BROUILLON -> Validar + Cancelar */}
                     {p.statut === 'BROUILLON' && (
-                      <button 
-                        onClick={() => handleValider(p.id)} 
-                        className="btn btn-success btn-sm"
-                        title="Validar pedido"
-                      >
-                        Validar
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleValider(p.id)}
+                          className="btn btn-success btn-sm"
+                          title="Validar pedido"
+                        >
+                          Validar
+                        </button>
+                        <button
+                          onClick={() => handleAnnuler(p.id)}
+                          className="btn btn-neutral btn-sm"
+                          title="Cancelar operação"
+                        >
+                          Cancelar
+                        </button>
+                      </>
                     )}
 
                     {/* EN_ATTENTE -> Aprovar / Recusar (sauf INSTALACAO et ENTRADA — D1) */}
@@ -1513,6 +1570,7 @@ function PedidosContent() {
                   selectedPedido.statut === 'APPROUVEE' ? 'badge-info' :
                   selectedPedido.statut === 'ENTREGUE' ? 'badge-success' :
                   selectedPedido.statut === 'RECEBIDA' ? 'badge-primary' :
+                  selectedPedido.statut === 'ANNULE' ? 'badge-neutral' :
                   'badge-error'
                 }`}>
                   {getPedidoStatusLabel(selectedPedido)}
@@ -1528,12 +1586,21 @@ function PedidosContent() {
             </div>
 
             {/* Description */}
-            {selectedPedido.description && (
-              <div className="mb-6">
-                <strong>Justificativa:</strong>
-                <p className="text-sm opacity-80 mt-1">{formatJustificativa(selectedPedido.description)}</p>
-              </div>
-            )}
+            <div className="mb-6">
+              <strong>Justificativa:</strong>
+              {editMode ? (
+                <textarea
+                  className="textarea textarea-bordered w-full mt-1"
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                />
+              ) : (
+                <p className="text-sm opacity-80 mt-1">
+                  {selectedPedido.description ? formatJustificativa(selectedPedido.description) : '-'}
+                </p>
+              )}
+            </div>
 
             {/* Raison de refus */}
             {selectedPedido.raison_refus && (
@@ -1549,10 +1616,10 @@ function PedidosContent() {
               <table className="table table-sm">
                 <thead>
                   <tr>
-                    <th>Codigo</th>
-                    <th>Descricao</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
                     <th>Qtd Pedida</th>
-                    <th>Qtd Aprovada</th>
+                    {!editMode && <th>Qtd Aprovada</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1560,12 +1627,29 @@ function PedidosContent() {
                     <tr key={item.id}>
                       <td className="font-bold">{item.materiel_code}</td>
                       <td>{item.materiel_description}</td>
-                      <td>{item.quantite_demandee}</td>
                       <td>
-                        <span className="badge badge-success">
-                          {item.quantite_approuvee || item.quantite_demandee || 0}
-                        </span>
+                        {editMode ? (
+                          <input
+                            type="number"
+                            min="1"
+                            className="input input-bordered input-sm w-24"
+                            value={editQuantities[item.id] ?? item.quantite_demandee}
+                            onChange={(e) => setEditQuantities((prev) => ({
+                              ...prev,
+                              [item.id]: Math.max(1, Number(e.target.value) || 1),
+                            }))}
+                          />
+                        ) : (
+                          item.quantite_demandee
+                        )}
                       </td>
+                      {!editMode && (
+                        <td>
+                          <span className="badge badge-success">
+                            {item.quantite_approuvee || item.quantite_demandee || 0}
+                          </span>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1573,18 +1657,65 @@ function PedidosContent() {
             </div>
 
             <div className="modal-action mt-6">
-              <button
-                className="btn btn-outline"
-                onClick={() => router.push(getFormularioHref(selectedPedido))}
-              >
-                Imprimir
-              </button>
-              <button 
-                className="btn btn-ghost" 
-                onClick={() => setDetailModalOpen(false)}
-              >
-                Fechar
-              </button>
+              {!editMode && (
+                <button
+                  className="btn btn-outline"
+                  onClick={() => router.push(getFormularioHref(selectedPedido))}
+                >
+                  Imprimir
+                </button>
+              )}
+              {editMode ? (
+                <>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setEditMode(false)}
+                    disabled={editSaving}
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleSaveModification}
+                    disabled={editSaving}
+                  >
+                    {editSaving ? 'A guardar...' : 'Guardar Modificações'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="btn btn-warning"
+                  onClick={openEditMode}
+                >
+                  ✏️ Modificar
+                </button>
+              )}
+              {selectedPedido.statut === 'BROUILLON' && !editMode && (
+                <button
+                  className="btn btn-neutral"
+                  onClick={async () => {
+                    if (!confirm('Tem certeza que deseja cancelar esta operação?')) return;
+                    try {
+                      await api.post(`/pedidos/${selectedPedido.id}/annuler/`);
+                      alert('Operação cancelada com sucesso.');
+                      setDetailModalOpen(false);
+                      loadPedidos(page);
+                    } catch (err: any) {
+                      alert('Erro: ' + (err.response?.data?.detail || 'Erro desconhecido'));
+                    }
+                  }}
+                >
+                  Cancelar Operação
+                </button>
+              )}
+              {!editMode && (
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setDetailModalOpen(false)}
+                >
+                  Fechar
+                </button>
+              )}
             </div>
           </div>
         </div>

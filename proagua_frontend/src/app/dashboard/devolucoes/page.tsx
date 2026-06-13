@@ -118,6 +118,7 @@ export default function DevolucoesPage() {
   const [quantidade, setQuantidade] = useState('');
   const [items, setItems] = useState<CreateItem[]>([]);
   const [origemPedidos, setOrigemPedidos] = useState<Pedido[]>([]);
+  const [searchOrigem, setSearchOrigem] = useState('');
   const [depsLoaded, setDepsLoaded] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
@@ -132,7 +133,12 @@ export default function DevolucoesPage() {
       const data: Pedido[] | PaginatedResponse<Pedido> = res.data;
       const batch: Pedido[] = Array.isArray(data) ? data : data.results || [];
       collected.push(...batch);
-      nextPath = Array.isArray(data) ? null : data.next || null;
+      if (Array.isArray(data) || !data.next) {
+        nextPath = null;
+      } else {
+        const u = new URL(data.next);
+        nextPath = u.pathname.replace(/^\/api/, '') + u.search;
+      }
     }
     return collected;
   };
@@ -190,6 +196,7 @@ export default function DevolucoesPage() {
     setSelectedEntrepotId('');
     setQuantidade('');
     setItems([]);
+    setSearchOrigem('');
       await loadCreateDependencies(true);
   };
 
@@ -216,6 +223,12 @@ export default function DevolucoesPage() {
       )
       .sort((a, b) => new Date(b.date_demande).getTime() - new Date(a.date_demande).getTime());
   }, [origemPedidos, origemTipo]);
+
+  const filteredOrigemOptions = useMemo(() => {
+    const q = searchOrigem.trim().toLowerCase();
+    if (!q) return origemOptions;
+    return origemOptions.filter((p) => (p.reference || '').toLowerCase().includes(q));
+  }, [origemOptions, searchOrigem]);
 
   const selectedOrigemPedido = useMemo(
     () => origemOptions.find((p) => String(p.id) === selectedOrigemPedidoId) || null,
@@ -555,6 +568,7 @@ export default function DevolucoesPage() {
                     setSelectedEntrepotId('');
                     setItems([]);
                     setSelectedMaterielId('');
+                    setSearchOrigem('');
                   }}
                 >
                   <option value="SAIDA">{origemLabel.SAIDA}</option>
@@ -578,6 +592,13 @@ export default function DevolucoesPage() {
               </div>
               <div>
                 <label className="label"><span className="label-text">Referência de origem</span></label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full mb-1"
+                  placeholder="Pesquisar por referência..."
+                  value={searchOrigem}
+                  onChange={(e) => setSearchOrigem(e.target.value)}
+                />
                 <select
                   className="select select-bordered w-full"
                   value={selectedOrigemPedidoId}
@@ -592,13 +613,22 @@ export default function DevolucoesPage() {
                     setSelectedMaterielId('');
                   }}
                 >
-                  <option value="">Selecione a operação de origem</option>
-                  {origemOptions.map((p) => (
+                  <option value="">
+                    {filteredOrigemOptions.length === 0
+                      ? 'Nenhuma operação encontrada'
+                      : 'Selecione a operação de origem'}
+                  </option>
+                  {filteredOrigemOptions.map((p) => (
                     <option key={p.id} value={p.id}>
                       {`${p.reference} | ${new Date(p.date_demande).toLocaleDateString('pt-BR')} | ${p.statut}`}
                     </option>
                   ))}
                 </select>
+                {searchOrigem && (
+                  <div className="mt-1 text-xs text-gray-500">
+                    {filteredOrigemOptions.length} resultado(s) para "{searchOrigem}"
+                  </div>
+                )}
               </div>
               <div>
                 <label className="label"><span className="label-text">Demandante real</span></label>

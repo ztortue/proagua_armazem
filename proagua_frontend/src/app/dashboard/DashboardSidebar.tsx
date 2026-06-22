@@ -43,6 +43,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/alertes-stock', label: 'Alertes Stock', icon: ExclamationTriangleIcon, iconColor: 'text-warning', usePilierFilter: true },
   { href: '/dashboard/pedidos', label: 'Operações', icon: ClipboardDocumentListIcon, iconColor: 'text-secondary', usePilierFilter: true },
   { href: '/dashboard/formulaires', label: 'Formulários', icon: ClipboardDocumentListIcon, iconColor: 'text-primary', usePilierFilter: true },
+  { href: '/dashboard/template-formulario', label: 'Template Impressão', icon: ClipboardDocumentListIcon, iconColor: 'text-success' },
   { href: '/dashboard/transferencias', label: 'Transferências', icon: TruckIcon, iconColor: 'text-info', usePilierFilter: true },
   { href: '/dashboard/devolucoes', label: 'Devoluções', icon: TruckIcon, iconColor: 'text-warning', iconClassName: '-scale-x-100', usePilierFilter: true },
   { href: '/dashboard/movimentos', label: 'Movimentos', icon: TruckIcon, iconColor: 'text-accent', usePilierFilter: true },

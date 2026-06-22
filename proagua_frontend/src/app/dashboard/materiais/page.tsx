@@ -124,10 +124,13 @@ function MateriaisContent() {
     stock_min: '0',
     stock_max: '',
     prix_unitaire: '0',
+    fournisseur_nom: '',
+    reference_fournisseur: '',
   });
 
   const [categories, setCategories] = useState<any[]>([]);
   const [sousCategories, setSousCategories] = useState<any[]>([]);
+  const [fournisseurs, setFournisseurs] = useState<any[]>([]);
   const [entrepots, setEntrepots] = useState<any[]>([]);
   const [usosTipicos, setUsosTipicos] = useState<any[]>([]);
   const [utilisateursFinal, setUtilisateursFinal] = useState<any[]>([]);
@@ -241,10 +244,11 @@ function MateriaisContent() {
         if (params.toString()) url += '&' + params.toString();
         const entrepotsUrl = effectivePilier ? `/entrepots/?pilier=${effectivePilier}` : '/entrepots/';
 
-        const [resMateriais, allCategories, allSousCategories, resEntrepots, resUsosTipicos, resDemandantes] = await Promise.all([
+        const [resMateriais, allCategories, allSousCategories, allFournisseurs, resEntrepots, resUsosTipicos, resDemandantes] = await Promise.all([
           api.get(url),
           fetchAllPages('/categories/?page=1'),
           fetchAllPages('/souscategories/?page=1'),
+          fetchAllPages('/fournisseurs/?page=1'),
           api.get(entrepotsUrl),
           api.get('/usos-tipicos/'),
           api.get('/utilisateurs-final/'),
@@ -262,6 +266,7 @@ function MateriaisContent() {
         }
         setCategories(allCategories);
         setSousCategories(allSousCategories);
+        setFournisseurs(allFournisseurs);
         setNouveauMateriel((prev) => ({ ...prev }));
         setEntrepots(Array.isArray(resEntrepots.data) ? resEntrepots.data : resEntrepots.data.results || []);
         setUsosTipicos(Array.isArray(resUsosTipicos.data) ? resUsosTipicos.data : resUsosTipicos.data.results || []);
@@ -394,6 +399,17 @@ function MateriaisContent() {
       .filter((cat: any) => String(cat?.famille?.id || '') === selectedFamilleId)
       .sort((a: any, b: any) => String(a?.nom || '').localeCompare(String(b?.nom || '')));
   }, [categories, selectedFamilleId]);
+
+  const fournisseurNameStatus = useMemo(() => {
+    const value = nouveauMateriel.fournisseur_nom.trim();
+    if (!value) return null;
+    const normalizedValue = normalizeText(value);
+    const exact = fournisseurs.find((f: any) => normalizeText(f?.nom || '') === normalizedValue);
+    if (exact) {
+      return { type: 'existing', message: `Fornecedor existente: ${exact.nom}` };
+    }
+    return { type: 'new', message: 'Novo fornecedor será criado ao salvar.' };
+  }, [fournisseurs, nouveauMateriel.fournisseur_nom]);
 
   useEffect(() => {
     if (!filterCategorie) return;
@@ -606,6 +622,14 @@ function MateriaisContent() {
       alert('Selecione a categoria do material.');
       return;
     }
+    if (!nouveauMateriel.fournisseur_nom.trim()) {
+      alert('Informe o nome do fornecedor.');
+      return;
+    }
+    if (!nouveauMateriel.reference_fournisseur.trim()) {
+      alert('Informe a referencia do fornecedor.');
+      return;
+    }
 
     const selectedFamille = famillesOptions.find((fam) => fam.id === selectedFamilleId);
     const payload: Record<string, string | number> = {
@@ -617,6 +641,8 @@ function MateriaisContent() {
       stock_min: Number(nouveauMateriel.stock_min || 0),
       ...(nouveauMateriel.stock_inicial !== '' && { stock_inicial: Number(nouveauMateriel.stock_inicial) }),
       prix_unitaire: Number(nouveauMateriel.prix_unitaire || 0),
+      fournisseur_nom: nouveauMateriel.fournisseur_nom.trim(),
+      reference_fournisseur: nouveauMateriel.reference_fournisseur.trim(),
     };
 
     if (nouveauMateriel.souscategorie_id) {
@@ -676,6 +702,8 @@ function MateriaisContent() {
         stock_min: '0',
         stock_max: '',
         prix_unitaire: '0',
+        fournisseur_nom: '',
+        reference_fournisseur: '',
       });
 
       // Rechaje paj la
@@ -1194,6 +1222,23 @@ function MateriaisContent() {
               </div>
 
               <div>
+                <label className="label"><span className="label-text font-bold">Fornecedor *</span></label>
+                <input type="text" placeholder="Nome do fornecedor" className="input input-bordered w-full" value={nouveauMateriel.fournisseur_nom} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, fournisseur_nom: e.target.value }))} />
+                {fournisseurNameStatus && (
+                  <label className="label">
+                    <span className={`label-text-alt ${fournisseurNameStatus.type === 'existing' ? 'text-success' : 'text-warning'}`}>
+                      {fournisseurNameStatus.message}
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              <div>
+                <label className="label"><span className="label-text font-bold">Referencia do Fornecedor *</span></label>
+                <input type="text" maxLength={255} placeholder="Codigo/reference conforme o fornecedor" className="input input-bordered w-full" value={nouveauMateriel.reference_fournisseur} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, reference_fournisseur: e.target.value }))} />
+              </div>
+
+              <div>
                 <label className="label"><span className="label-text font-bold">Diametro Nominal (mm)</span></label>
                 <input type="number" placeholder="110" className="input input-bordered w-full" value={nouveauMateriel.diametre_nominal} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, diametre_nominal: e.target.value }))} disabled={!isHydraulicTypeSelected} />
               </div>
@@ -1316,7 +1361,7 @@ function MateriaisContent() {
               {/* ✅ FIX #4 — Retire !photoFile — foto pa obligatwa pou aktive bouton */}
               <button
                 onClick={handleCreateMaterial}
-                disabled={!nouveauMateriel.description || !nouveauMateriel.categorie_id || !nouveauMateriel.entrepot_principal_id}
+                disabled={!nouveauMateriel.description || !nouveauMateriel.categorie_id || !nouveauMateriel.entrepot_principal_id || !nouveauMateriel.fournisseur_nom.trim() || !nouveauMateriel.reference_fournisseur.trim()}
                 className="btn btn-success btn-lg px-10"
               >
                 Criar Material

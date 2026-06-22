@@ -100,7 +100,12 @@ function TransferenciasContent() {
       const data = res.data;
       const batch: Pedido[] = Array.isArray(data) ? data : data.results || [];
       collected.push(...batch);
-      nextPath = Array.isArray(data) ? null : (data.next ? new URL(data.next).pathname + new URL(data.next).search : null);
+      if (Array.isArray(data) || !data.next) {
+        nextPath = null;
+      } else {
+        const u = new URL(data.next);
+        nextPath = u.pathname.replace(/^\/api/, '') + u.search;
+      }
     }
     return collected;
   };
@@ -142,15 +147,26 @@ function TransferenciasContent() {
     setLoadingOrigemMateriais(true);
     setOrigemMateriais([]);
     try {
-      const res = await api.get(`/materiais/?entrepot=${entrepotId}`);
-      const data = res.data;
-      const list: any[] = Array.isArray(data) ? data : data.results || [];
-      const result: OrigemMateriel[] = list
+      const allMaterials: any[] = [];
+      let nextPath: string | null = '/materiais/';
+      while (nextPath) {
+        const res: any = await api.get(nextPath);
+        const data = res.data;
+        const batch: any[] = Array.isArray(data) ? data : data.results || [];
+        allMaterials.push(...batch);
+        if (Array.isArray(data) || !data.next) {
+          nextPath = null;
+        } else {
+          const u = new URL(data.next);
+          nextPath = u.pathname.replace(/^\/api/, '') + u.search;
+        }
+      }
+      const result: OrigemMateriel[] = allMaterials
         .map((m: any) => {
           const loc = (m.stock_locations || []).find(
-            (l: any) => Number(l.entrepot_id ?? l.id) === entrepotId
+            (l: any) => Number(l.entrepot_id_value ?? l.entrepot_id) === entrepotId
           );
-          const stock = loc ? Number(loc.quantite) : Number(m.stock_actuel || 0);
+          const stock = loc ? Number(loc.quantite) : 0;
           return { id: m.id, code: m.code, description: m.description, stock };
         })
         .filter((m) => m.stock > 0)

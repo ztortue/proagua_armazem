@@ -207,7 +207,7 @@ class MaterielSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'code', 'description', 'unite',
             'categorie', 'categorie_id',
-            'fournisseur', 'fournisseur_id', 'fournisseur_nom', 'fournisseurs_possibles',
+            'fournisseur', 'fournisseur_id', 'fournisseur_nom', 'reference_fournisseur', 'fournisseurs_possibles',
             'entrepot_principal', 'entrepot_principal_id',
             'souscategorie', 'souscategorie_id',
             'stock_inicial', 'stock_min', 'stock_max', 'prix_unitaire',
@@ -219,6 +219,24 @@ class MaterielSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'code': {'required': False, 'allow_blank': True},
         }
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        is_create = self.instance is None
+        fournisseur_nom = (self.initial_data.get('fournisseur_nom') or '').strip()
+        reference_fournisseur = (attrs.get('reference_fournisseur') or '').strip()
+
+        if is_create and not fournisseur_nom:
+            raise serializers.ValidationError({
+                'fournisseur_nom': 'O nome do fornecedor é obrigatório.'
+            })
+        if is_create and not reference_fournisseur:
+            raise serializers.ValidationError({
+                'reference_fournisseur': 'A referencia do fornecedor é obrigatória.'
+            })
+        if 'reference_fournisseur' in attrs:
+            attrs['reference_fournisseur'] = reference_fournisseur
+        return attrs
 
     def get_fournisseurs_possibles(self, obj):
         return list(

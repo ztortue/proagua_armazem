@@ -383,6 +383,7 @@ class Materiel(models.Model):
         related_name='materiels_catalogo',
         blank=True,
     )
+    reference_fournisseur = models.CharField("Referencia do Fornecedor", max_length=255, blank=True, default='')
     souscategorie = models.ForeignKey(
         SousCategorie,
         on_delete=models.SET_NULL,

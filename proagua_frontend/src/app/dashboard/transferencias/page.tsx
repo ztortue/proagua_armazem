@@ -1,8 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { api } from '../lib/api';
 
 type Pedido = {
@@ -50,19 +49,7 @@ type OrigemMateriel = {
   stock: number;
 };
 
-function parseOrigemMeta(text?: string) {
-  const src = text || '';
-  const tipoMatch = src.match(/\[ORIGEM_TIPO:([A-Z_]+)\]/);
-  const refMatch = src.match(/\[ORIGEM_REF:([^\]]+)\]/);
-  return {
-    tipo: tipoMatch?.[1] || null,
-    referencia: refMatch?.[1] || null,
-  };
-}
-
 function TransferenciasContent() {
-  const searchParams = useSearchParams();
-  const pilierParam = searchParams.get('pilier');
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<Pedido[]>([]);
   const [page, setPage] = useState(1);
@@ -92,9 +79,9 @@ function TransferenciasContent() {
   const [workflowLoading, setWorkflowLoading] = useState(false);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
 
-  const fetchAllPedidos = async (): Promise<Pedido[]> => {
+  const fetchAllTransferencias = async (): Promise<Pedido[]> => {
     const collected: Pedido[] = [];
-    let nextPath: string | null = '/pedidos/?page=1';
+    let nextPath: string | null = '/pedidos/?tipo_fluxo=TRANSFERENCIA&page=1';
     while (nextPath) {
       const res: { data: Pedido[] | PaginatedResponse<Pedido> } = await api.get(nextPath);
       const data = res.data;
@@ -113,10 +100,7 @@ function TransferenciasContent() {
   const loadTransferencias = async () => {
     setLoading(true);
     try {
-      const collected = await fetchAllPedidos();
-      const transferencias = collected
-        .filter((p) => p.formulario?.tipo_fluxo === 'TRANSFERENCIA')
-        .sort((a, b) => new Date(b.date_demande).getTime() - new Date(a.date_demande).getTime());
+      const transferencias = await fetchAllTransferencias();
       setRows(transferencias);
     } catch (error) {
       console.error('Erro ao carregar transferencias:', error);
@@ -143,33 +127,28 @@ function TransferenciasContent() {
     }
   };
 
-  const loadMateriaisOrigem = async (entrepotId: number) => {
+  const loadMateriaisOrigem = useCallback(async (entrepotId: number, search = '') => {
     setLoadingOrigemMateriais(true);
     setOrigemMateriais([]);
     try {
-      const allMaterials: any[] = [];
-      let nextPath: string | null = '/materiais/';
-      while (nextPath) {
-        const res: any = await api.get(nextPath);
-        const data = res.data;
-        const batch: any[] = Array.isArray(data) ? data : data.results || [];
-        allMaterials.push(...batch);
-        if (Array.isArray(data) || !data.next) {
-          nextPath = null;
-        } else {
-          const u = new URL(data.next);
-          nextPath = u.pathname.replace(/^\/api/, '') + u.search;
-        }
-      }
-      const result: OrigemMateriel[] = allMaterials
-        .map((m: any) => {
-          const loc = (m.stock_locations || []).find(
-            (l: any) => Number(l.entrepot_id_value ?? l.entrepot_id) === entrepotId
-          );
-          const stock = loc ? Number(loc.quantite) : 0;
-          return { id: m.id, code: m.code, description: m.description, stock };
-        })
-        .filter((m) => m.stock > 0)
+      const params = new URLSearchParams({
+        mode: 'transfer',
+        entrepot: String(entrepotId),
+        quantite__gt: '0',
+        ordering: '-quantite',
+        page_size: '50',
+      });
+      if (search.trim()) params.set('search', search.trim());
+      const res: any = await api.get(`/estoques/?${params.toString()}`);
+      const data = res.data;
+      const batch: any[] = Array.isArray(data) ? data : data.results || [];
+      const result: OrigemMateriel[] = batch
+        .map((s: any) => ({
+          id: Number(s.materiel_id_value),
+          code: String(s.materiel_code),
+          description: String(s.materiel_description),
+          stock: Number(s.quantite),
+        }))
         .sort((a, b) => a.code.localeCompare(b.code));
       setOrigemMateriais(result);
     } catch (error) {
@@ -178,7 +157,15 @@ function TransferenciasContent() {
     } finally {
       setLoadingOrigemMateriais(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedEntrepotOrigemId) return;
+    const timer = window.setTimeout(() => {
+      loadMateriaisOrigem(Number(selectedEntrepotOrigemId), searchMateriel);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [loadMateriaisOrigem, selectedEntrepotOrigemId, searchMateriel]);
 
   const openCreate = async () => {
     setCreateOpen(true);
@@ -295,11 +282,11 @@ function TransferenciasContent() {
   };
 
   const refreshAndKeepSelection = async (pedidoId?: number) => {
-    await loadTransferencias();
-    if (!pedidoId) return;
-    const all = await fetchAllPedidos();
-    const next = all.find((p) => p.id === pedidoId) || null;
-    setSelectedPedido(next);
+    const transferencias = await fetchAllTransferencias();
+    setRows(transferencias);
+    if (pedidoId) {
+      setSelectedPedido(transferencias.find((p) => p.id === pedidoId) || null);
+    }
   };
 
   const markAsTraiter = async () => {
@@ -487,8 +474,7 @@ function TransferenciasContent() {
                     setSelectedMaterielId('');
                     setQuantidade('');
                     setSearchMateriel('');
-                    if (id) loadMateriaisOrigem(Number(id));
-                    else setOrigemMateriais([]);
+                    if (!id) setOrigemMateriais([]);
                   }}
                 >
                   <option value="">Selecione o depósito de origem</option>

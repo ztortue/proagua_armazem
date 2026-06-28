@@ -11,6 +11,7 @@ import csv
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework import viewsets, permissions, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -376,13 +377,21 @@ class MaterielViewSet(viewsets.ModelViewSet):
 
 
 # ===================================================================
+class StockPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 # STOCK ENTREPOT - ✅ TOUT MOUN KA LIST/RETRIEVE
 # ===================================================================
 class StockEntrepotViewSet(viewsets.ModelViewSet):
+    pagination_class = StockPagination
     queryset = StockEntrepot.objects.select_related('materiel', 'entrepot', 'emplacement')
     serializer_class = StockEntrepotSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
     filterset_fields = ['entrepot', 'materiel', 'status']
+    search_fields = ['materiel__code', 'materiel__description']
     ordering_fields = ['quantite']
     ordering = ['-quantite']
 
@@ -402,10 +411,16 @@ class StockEntrepotViewSet(viewsets.ModelViewSet):
         if transfer_mode:
             entrepot_id = self.request.query_params.get('entrepot')
             if entrepot_id and str(entrepot_id).isdigit():
-                return qs.filter(entrepot_id=int(entrepot_id)).order_by('-quantite')
-            return qs.none()
+                qs = qs.filter(entrepot_id=int(entrepot_id))
+            else:
+                return qs.none()
+        else:
+            qs = _filter_by_user_pilier(qs, self.request.user, 'entrepot__projet__pilier')
 
-        qs = _filter_by_user_pilier(qs, self.request.user, 'entrepot__projet__pilier')
+        quantite_gt = self.request.query_params.get('quantite__gt')
+        if quantite_gt is not None and str(quantite_gt).lstrip('-').isdigit():
+            qs = qs.filter(quantite__gt=int(quantite_gt))
+
         return qs.order_by('-quantite')
 
     def perform_create(self, serializer):
@@ -608,28 +623,32 @@ class DemandeLotViewSet(viewsets.ModelViewSet):
         user = self.request.user
         consultation_q = Q(is_consultation=True)
         pilier_filter = {'items__entrepot__projet__pilier': user.pilier_affectation}
-        
+
         # ADMIN wè tout bagay
         if user.role == 'ADMIN':
             qs = DemandeLot.objects.all()
             if not _is_all_pilier_user(user):
                 qs = qs.filter(**pilier_filter)
-            return qs.distinct().order_by('-date_demande')
-        
+
         # MANAGER wè sèlman pedidos nan pwojè yo responsab
-        if user.role == 'MANAGER':
+        elif user.role == 'MANAGER':
             projets = ProjetChantier.objects.filter(responsable=user)
             qs = DemandeLot.objects.filter(
                 consultation_q | Q(demandeur=user) | Q(projet__in=projets)
             )
             if not _is_all_pilier_user(user):
                 qs = qs.filter(**pilier_filter)
-            return qs.distinct().order_by('-date_demande')
-        
+
         # USER wè sèlman pedidos pa yo
-        qs = DemandeLot.objects.filter(consultation_q | Q(demandeur=user))
-        if not _is_all_pilier_user(user):
-            qs = qs.filter(**pilier_filter)
+        else:
+            qs = DemandeLot.objects.filter(consultation_q | Q(demandeur=user))
+            if not _is_all_pilier_user(user):
+                qs = qs.filter(**pilier_filter)
+
+        tipo_fluxo = self.request.query_params.get('tipo_fluxo')
+        if tipo_fluxo:
+            qs = qs.filter(formulario__tipo_fluxo=tipo_fluxo.upper())
+
         return qs.distinct().order_by('-date_demande')
 
     def perform_create(self, serializer):

@@ -881,6 +881,7 @@ class PedidoFormulario(models.Model):
     motivo = models.TextField(blank=True)
     destino_uso = models.CharField(max_length=255, blank=True)
     observacoes = models.TextField(blank=True)
+    nome_solicitante_fisico = models.CharField(max_length=255, blank=True, default='')
     data_retorno_prevista = models.DateTimeField(
         "Data/Hora Prevista de Retorno",
         null=True,

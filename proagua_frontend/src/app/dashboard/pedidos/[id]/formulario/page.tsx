@@ -35,6 +35,7 @@ type Formulario = {
   motivo: string;
   destino_uso: string;
   observacoes: string;
+  nome_solicitante_fisico?: string;
   data_retorno_prevista?: string | null;
   numero_formulario_saida?: string | null;
   entrepot_origem?: number | null;
@@ -254,6 +255,7 @@ export default function PedidoFormularioPage() {
       }));
       const payload = isDatasOnlyMode
         ? {
+            nome_solicitante_fisico: formulario.nome_solicitante_fisico || '',
             item_datas_necessarias: itemDatasPayload,
           }
         : {
@@ -262,6 +264,7 @@ export default function PedidoFormularioPage() {
             motivo: formulario.motivo || '',
             destino_uso: formulario.destino_uso || '',
             observacoes: formulario.observacoes || '',
+            nome_solicitante_fisico: formulario.nome_solicitante_fisico || '',
             data_retorno_prevista:
               formulario.tipo_fluxo === 'EMPRESTIMO'
                 ? (formulario.data_retorno_prevista || null)
@@ -584,9 +587,9 @@ export default function PedidoFormularioPage() {
               />
             </div>
             <div>
-              <label className="label"><span className="label-text">Destino de uso</span></label>
+              <label className="label"><span className="label-text font-bold">Destino de uso</span></label>
               <input
-                className="input input-bordered w-full"
+                className="input input-bordered w-full font-semibold"
                 disabled={isDatasOnlyMode || isFormularioFullyLocked}
                 value={formulario.destino_uso || ''}
                 onChange={(e) => setFormulario((prev) => (prev ? { ...prev, destino_uso: e.target.value } : prev))}
@@ -644,10 +647,20 @@ export default function PedidoFormularioPage() {
         </div>
 
         <div className="card bg-base-100 shadow">
-          <div className="card-body text-sm space-y-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="card-body space-y-3">
+            <div className="text-sm grid grid-cols-1 md:grid-cols-2 gap-4">
               <div><strong>Solicitado por:</strong> {solicitadoPorDisplay} ({formatDate(formulario.solicitado_em)})</div>
               <div><strong>{fechamentoLabel.actorLabel}:</strong> {fechamentoLabel.actorName} ({formatDate(fechamentoLabel.actorDate)})</div>
+            </div>
+            <div>
+              <label className="label"><span className="label-text">Nome do solicitante (pessoa física)</span></label>
+              <input
+                className="input input-bordered w-full md:w-1/2"
+                disabled={isFormularioFullyLocked}
+                placeholder="Nome de quem fez o pedido"
+                value={formulario.nome_solicitante_fisico || ''}
+                onChange={(e) => setFormulario((prev) => (prev ? { ...prev, nome_solicitante_fisico: e.target.value } : prev))}
+              />
             </div>
           </div>
         </div>
@@ -719,8 +732,28 @@ export default function PedidoFormularioPage() {
                   : '-'}
               </div>
               <div><strong>Projeto:</strong> {projetoComPilar}</div>
+              <div><strong>Tipo de fluxo:</strong> {formulario.tipo_fluxo}</div>
+              <div><strong>Prioridade:</strong> {formulario.prioridade}</div>
               <div><strong>Tipo de Material:</strong> {tipoMaterialPedido}</div>
             </div>
+
+            {formulario.destino_uso && (
+              <div style={{ margin: '8px 0', padding: '8px 12px', border: '2px solid #0284c7', borderRadius: '4px', background: '#eff6ff' }}>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#0369a1', fontWeight: 700, marginBottom: '2px' }}>Destino de uso</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0c4a6e' }}>{formulario.destino_uso}</div>
+              </div>
+            )}
+
+            {(formulario.motivo || formulario.observacoes) && (
+              <div style={{ display: 'grid', gridTemplateColumns: formulario.motivo && formulario.observacoes ? '1fr 1fr' : '1fr', gap: '6px', fontSize: '11px', marginBottom: '4px' }}>
+                {formulario.motivo && (
+                  <div><strong>Motivo:</strong> {formulario.motivo}</div>
+                )}
+                {formulario.observacoes && (
+                  <div><strong>Observações:</strong> {formulario.observacoes}</div>
+                )}
+              </div>
+            )}
 
             <table className="print-table">
               <thead>
@@ -750,6 +783,12 @@ export default function PedidoFormularioPage() {
               <div className="print-signatures-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
                 <div className="print-sign-box">
                   <div><strong>Solicitado por:</strong> {solicitadoPorDisplay}</div>
+                  {formulario.nome_solicitante_fisico && (
+                    <div><strong>Nome:</strong> {formulario.nome_solicitante_fisico}</div>
+                  )}
+                  {!formulario.nome_solicitante_fisico && (
+                    <div><strong>Nome:</strong> ____________________________</div>
+                  )}
                   <div><strong>Data:</strong> {formatDate(formulario.solicitado_em)}</div>
                   <div style={{ marginTop: '24px' }}>Assinatura: ____________________</div>
                 </div>

@@ -667,7 +667,7 @@ class PedidoFormularioSerializer(serializers.ModelSerializer):
     class Meta:
         model = PedidoFormulario
         fields = [
-            'id', 'demande_lot', 'tipo_fluxo', 'prioridade', 'motivo', 'destino_uso', 'observacoes', 'data_retorno_prevista',
+            'id', 'demande_lot', 'tipo_fluxo', 'prioridade', 'motivo', 'destino_uso', 'observacoes', 'nome_solicitante_fisico', 'data_retorno_prevista',
             'numero_formulario_saida', 'numero_formulario_recebimento', 'estado_recebimento_geral', 'local_recebimento', 'observacao_recebimento',
             'entrepot_origem', 'entrepot_origem_id', 'entrepot_origem_nome',
             'entrepot_destino', 'entrepot_destino_id', 'entrepot_destino_nome',

@@ -808,6 +808,7 @@ class DemandeLotViewSet(viewsets.ModelViewSet):
             return Response(PedidoFormularioSerializer(formulario).data)
         payload = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
         item_datas = payload.pop('item_datas_necessarias', None)
+        nome_solicitante_fisico_novo = payload.pop('nome_solicitante_fisico', None)
         tipo_fluxo_efetivo = str(payload.get('tipo_fluxo') or formulario.tipo_fluxo or '').upper()
         is_saida_flow = tipo_fluxo_efetivo in ['INSTALACAO', 'EMPRESTIMO', 'TRANSFERENCIA', 'DEVOLUCAO']
         is_workflow_final = demande.statut in ['ENTREGUE', 'RECEBIDA']
@@ -867,7 +868,12 @@ class DemandeLotViewSet(viewsets.ModelViewSet):
             serializer = PedidoFormularioSerializer(formulario, data=payload, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response(serializer.data)
+            formulario.refresh_from_db()
+
+        if nome_solicitante_fisico_novo is not None:
+            formulario.nome_solicitante_fisico = str(nome_solicitante_fisico_novo)
+            formulario.save(update_fields=['nome_solicitante_fisico', 'updated_at'])
+
         return Response(PedidoFormularioSerializer(formulario).data)
 
     @action(detail=True, methods=['get'], url_path='historico-recebimento')

@@ -161,9 +161,31 @@ function MateriaisContent() {
   const [mergeLoading, setMergeLoading] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [mergeMasterId, setMergeMasterId] = useState<number | null>(null);
+  const [similarMateriais, setSimilarMateriais] = useState<Array<{ id: number; code: string; description: string; sim: number }>>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
   const [pilierResolved, setPilierResolved] = useState(false);
   const isValidPilier = (value: string | null | undefined): value is 'PILAR1' | 'PILAR2' | 'PILAR3' =>
     value === 'PILAR1' || value === 'PILAR2' || value === 'PILAR3';
+
+  useEffect(() => {
+    const desc = nouveauMateriel.description.trim();
+    if (desc.length < 3) {
+      setSimilarMateriais([]);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      setLoadingSimilar(true);
+      try {
+        const res = await api.get(`/materiais/similar/?q=${encodeURIComponent(desc)}`);
+        setSimilarMateriais(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setSimilarMateriais([]);
+      } finally {
+        setLoadingSimilar(false);
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [nouveauMateriel.description]);
 
   const entrepotOptions = useMemo(() => {
     if (lockedEntrepotId) {
@@ -1219,6 +1241,29 @@ function MateriaisContent() {
               <div>
                 <label className="label"><span className="label-text font-bold">Descricao *</span></label>
                 <input type="text" placeholder="Tubo PEHD DN110 PN10 - 12m" className="input input-bordered w-full" value={nouveauMateriel.description} onChange={(e) => setNouveauMateriel(prev => ({ ...prev, description: e.target.value }))} />
+                {loadingSimilar && (
+                  <div className="mt-1 text-xs opacity-60 flex items-center gap-1">
+                    <span className="loading loading-spinner loading-xs" /> Procurando similares...
+                  </div>
+                )}
+                {!loadingSimilar && similarMateriais.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-warning bg-warning/10 p-2 space-y-1">
+                    <div className="text-xs font-semibold text-warning-content opacity-80 mb-1">
+                      ⚠ {similarMateriais.length} material(ais) similar(es) já exist{similarMateriais.length === 1 ? 'e' : 'em'}:
+                    </div>
+                    {similarMateriais.map((m) => {
+                      const pct = Math.round(m.sim * 100);
+                      const color = pct >= 70 ? 'badge-error' : pct >= 40 ? 'badge-warning' : 'badge-info';
+                      return (
+                        <div key={m.id} className="flex items-center justify-between gap-2 text-xs bg-base-100 rounded px-2 py-1">
+                          <span className="font-mono font-bold text-primary shrink-0">{m.code}</span>
+                          <span className="flex-1 truncate opacity-80">{m.description}</span>
+                          <span className={`badge badge-sm ${color} shrink-0`}>{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div>

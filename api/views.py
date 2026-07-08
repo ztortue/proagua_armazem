@@ -154,7 +154,30 @@ class MaterielViewSet(viewsets.ModelViewSet):
             )
 
         return qs.distinct()
-    
+
+    @action(detail=False, methods=['get'], url_path='similar', permission_classes=[IsAuthenticated])
+    def similar(self, request):
+        q = request.query_params.get('q', '').strip()
+        if len(q) < 3:
+            return Response([])
+        from django.contrib.postgres.search import TrigramSimilarity
+        qs = (
+            Materiel.objects
+            .annotate(sim=TrigramSimilarity('description', q))
+            .filter(sim__gt=0.08)
+            .order_by('-sim')[:6]
+        )
+        results = [
+            {
+                'id': m.id,
+                'code': m.code,
+                'description': m.description,
+                'sim': round(float(m.sim), 2),
+            }
+            for m in qs
+        ]
+        return Response(results)
+
     def perform_create(self, serializer):
         """Creer stock initial dans le depot principal du materiel."""
         with transaction.atomic():

@@ -96,9 +96,7 @@ export default function FournisseursPage() {
       setFournisseurs(Array.isArray(data) ? data : (data?.results || []));
       setPage(1);
     } catch (err: any) {
-      const status = err?.response?.status;
-      const detail = err?.response?.data?.detail || err?.response?.data || err?.message || 'sem detalhe';
-      setError(`Erro ${status || 'rede'}: ${JSON.stringify(detail)}`);
+      setError(err?.response?.data?.detail || 'Erro ao carregar fornecedores.');
     } finally {
       setLoading(false);
     }

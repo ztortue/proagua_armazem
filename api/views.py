@@ -2024,6 +2024,7 @@ class SousCategorieViewSet(viewsets.ModelViewSet):
 class FournisseurViewSet(viewsets.ModelViewSet):
     queryset = Fournisseur.objects.all().order_by('nom')
     serializer_class = FournisseurSerializer
+    pagination_class = None
 
     def get_permissions(self):
         # ✅ LIST & RETRIEVE - Tout moun otantifye

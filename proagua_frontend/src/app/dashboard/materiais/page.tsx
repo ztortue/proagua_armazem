@@ -163,12 +163,14 @@ function MateriaisContent() {
   const [mergeMasterId, setMergeMasterId] = useState<number | null>(null);
   const [similarMateriais, setSimilarMateriais] = useState<Array<{ id: number; code: string; description: string; sim: number }>>([]);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
+  const [similarDismissed, setSimilarDismissed] = useState(false);
   const [pilierResolved, setPilierResolved] = useState(false);
   const isValidPilier = (value: string | null | undefined): value is 'PILAR1' | 'PILAR2' | 'PILAR3' =>
     value === 'PILAR1' || value === 'PILAR2' || value === 'PILAR3';
 
   useEffect(() => {
     const desc = nouveauMateriel.description.trim();
+    setSimilarDismissed(false);
     if (desc.length < 3) {
       setSimilarMateriais([]);
       return;
@@ -1246,10 +1248,19 @@ function MateriaisContent() {
                     <span className="loading loading-spinner loading-xs" /> Procurando similares...
                   </div>
                 )}
-                {!loadingSimilar && similarMateriais.length > 0 && (
+                {!loadingSimilar && similarMateriais.length > 0 && !similarDismissed && (
                   <div className="mt-2 rounded-lg border border-warning bg-warning/10 p-2 space-y-1">
-                    <div className="text-xs font-semibold text-warning-content opacity-80 mb-1">
-                      ⚠ {similarMateriais.length} material(ais) similar(es) já exist{similarMateriais.length === 1 ? 'e' : 'em'}:
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-warning-content opacity-80">
+                        ⚠ {similarMateriais.length} material(ais) similar(es) já exist{similarMateriais.length === 1 ? 'e' : 'em'}:
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-ghost opacity-60 hover:opacity-100"
+                        onClick={() => setSimilarDismissed(true)}
+                      >
+                        ✕ Ignorar
+                      </button>
                     </div>
                     {similarMateriais.map((m) => {
                       const pct = Math.round(m.sim * 100);

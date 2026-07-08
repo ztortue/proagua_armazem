@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 
 type Fournisseur = {
@@ -31,6 +31,44 @@ const emptyForm: FormState = {
   actif: true,
 };
 
+const PAGE_SIZE = 10;
+
+function Pagination({
+  page,
+  totalPages,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  totalPages: number;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        className="btn btn-sm btn-outline"
+        onClick={onPrev}
+        disabled={page <= 1}
+        type="button"
+      >
+        Anterior
+      </button>
+      <span className="text-sm font-medium">
+        {page} / {totalPages || 1}
+      </span>
+      <button
+        className="btn btn-sm btn-outline"
+        onClick={onNext}
+        disabled={page >= totalPages}
+        type="button"
+      >
+        Próxima
+      </button>
+    </div>
+  );
+}
+
 export default function FournisseursPage() {
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +76,17 @@ export default function FournisseursPage() {
   const [editing, setEditing] = useState<Fournisseur | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+
+  const totalPages = useMemo(
+    () => Math.ceil(fournisseurs.length / PAGE_SIZE),
+    [fournisseurs.length]
+  );
+
+  const paginated = useMemo(
+    () => fournisseurs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [fournisseurs, page]
+  );
 
   const load = async () => {
     setError('');
@@ -45,8 +94,11 @@ export default function FournisseursPage() {
       const res = await api.get('/fournisseurs/');
       const data = res.data;
       setFournisseurs(Array.isArray(data) ? data : (data?.results || []));
+      setPage(1);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Erro ao carregar fornecedores.');
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || err?.response?.data || err?.message || 'sem detalhe';
+      setError(`Erro ${status || 'rede'}: ${JSON.stringify(detail)}`);
     } finally {
       setLoading(false);
     }
@@ -94,7 +146,7 @@ export default function FournisseursPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center itemscenter min-h-screen">
+      <div className="flex justify-center items-center min-h-screen">
         <span className="loading loading-spinner loading-lg" />
       </div>
     );
@@ -102,8 +154,16 @@ export default function FournisseursPage() {
 
   return (
     <div className="p-8 space-y-4">
-      <div className="flex justify-between itemscenter">
-        <h1 className="text-4xl font-bold text-primary">Gestão de Fornecedores</h1>
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <h1 className="text-4xl font-bold text-primary">Gestão de Fornecedores</h1>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPrev={() => setPage((p) => p - 1)}
+            onNext={() => setPage((p) => p + 1)}
+          />
+        </div>
         <button
           onClick={() => {
             setEditing(null);
@@ -136,7 +196,7 @@ export default function FournisseursPage() {
             </tr>
           </thead>
           <tbody>
-            {fournisseurs.map((f) => (
+            {paginated.map((f) => (
               <tr key={f.id}>
                 <td className="font-semibold">{f.nom}</td>
                 <td>{f.contact || '-'}</td>
@@ -185,6 +245,15 @@ export default function FournisseursPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex justify-end">
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+        />
       </div>
 
       {modalOpen && (

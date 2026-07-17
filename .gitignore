@@ -57,3 +57,5 @@ img/
 backups/
 *.docx
 *.sql
+ssh/
+*.txt

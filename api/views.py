@@ -498,14 +498,25 @@ class MouvementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = Mouvement.objects.select_related('materiel', 'entrepot', 'demandeur', 'projet')
         user = self.request.user
-        if _is_all_pilier_user(user):
-            return qs.order_by('-date_mvt')
-        pilier = getattr(user, 'pilier_affectation', None)
-        if not pilier:
-            return qs.none()
-        return qs.filter(
-            Q(entrepot__projet__pilier=pilier) | Q(projet__pilier=pilier)
-        ).order_by('-date_mvt').distinct()
+        if not _is_all_pilier_user(user):
+            pilier = getattr(user, 'pilier_affectation', None)
+            if not pilier:
+                return qs.none()
+            qs = qs.filter(
+                Q(entrepot__projet__pilier=pilier) | Q(projet__pilier=pilier)
+            ).distinct()
+
+        # Filtre par site d'intervention (recherche partielle, insensible à la casse)
+        site_q = self.request.query_params.get('site', '').strip()
+        if site_q:
+            qs = qs.filter(site_intervention__icontains=site_q, type_mvt='SORTIE')
+
+        # Filtre optionnel par pilar
+        pilier_q = self.request.query_params.get('pilier', '').strip()
+        if pilier_q:
+            qs = qs.filter(pilier_intervention=pilier_q)
+
+        return qs.order_by('-date_mvt')
 
     def perform_create(self, serializer):
         with transaction.atomic():
@@ -1166,7 +1177,9 @@ class DemandeLotViewSet(viewsets.ModelViewSet):
                             entrepot=entrepot,
                             projet=demande.projet,
                             demandeur=demande.demandeur,
-                            raison=f"Entrega do pedido #{demande.id}"
+                            raison=f"Entrega do pedido #{demande.id}",
+                            site_intervention=demande.site_intervention or '',
+                            pilier_intervention=demande.pilier_intervention or '',
                         )
                         cache.delete(f"stock_actuel_{item.materiel.id}")
 
@@ -1259,7 +1272,9 @@ class DemandeLotViewSet(viewsets.ModelViewSet):
                             entrepot=entrepot_origem,
                             projet=entrepot_origem.projet,
                             demandeur=demande.demandeur,
-                            raison=f"Transferencia (saída) pedido #{demande.id} para {entrepot_destino.nom}"
+                            raison=f"Transferencia (saída) pedido #{demande.id} para {entrepot_destino.nom}",
+                            site_intervention=demande.site_intervention or '',
+                            pilier_intervention=demande.pilier_intervention or '',
                         )
                         Mouvement.objects.create(
                             type_mvt='ENTREE',

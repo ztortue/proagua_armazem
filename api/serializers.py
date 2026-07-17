@@ -360,6 +360,7 @@ class MouvementSerializer(serializers.ModelSerializer):
             "fournisseur", "fournisseur_id",
             "entrepot", "entrepot_id_value", "entrepot_id", "entrepot_destino_id",
             "demandeur",
+            "site_intervention", "pilier_intervention",
         ]
         read_only_fields = ['id', 'date_mvt', 'demandeur']
 
@@ -471,6 +472,8 @@ class DemandeLotCreateSerializer(serializers.ModelSerializer):
             'tipo_fluxo',
             'data_retorno_prevista',
             'entrepot_destino_id',
+            'site_intervention',
+            'pilier_intervention',
             'items',
         ]
 
@@ -799,7 +802,8 @@ class DemandeLotSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'reference', 'demandeur', 'demandeur_reel', 'projet', 'date_demande',
             'statut', 'description', 'raison_refus', 'items', 'formulario',
-            'updated_at', 'created_by_nome', 'updated_by_nome'
+            'updated_at', 'created_by_nome', 'updated_by_nome',
+            'site_intervention', 'pilier_intervention',
         ]
     def _user_name(self, user):
         if not user:

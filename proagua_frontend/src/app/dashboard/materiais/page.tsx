@@ -138,6 +138,8 @@ function MateriaisContent() {
   const [descricaoDemanda, setDescricaoDemanda] = useState('');
   const [selectedTipoFluxoDemanda, setSelectedTipoFluxoDemanda] = useState<'INSTALACAO' | 'EMPRESTIMO' | 'COMPRAS' | 'ENTRADA'>('INSTALACAO');
   const [dataRetornoPrevistaDemanda, setDataRetornoPrevistaDemanda] = useState('');
+  const [siteIntervention, setSiteIntervention] = useState('');
+  const [pilierIntervention, setPilierIntervention] = useState('');
   const [addItemSearchDemanda, setAddItemSearchDemanda] = useState('');
   const [addItemIdDemanda, setAddItemIdDemanda] = useState('');
   const [addItemPoolDemanda, setAddItemPoolDemanda] = useState<any[]>([]);
@@ -525,6 +527,8 @@ function MateriaisContent() {
             ? new Date(dataRetornoPrevistaDemanda).toISOString()
             : null,
         entrepot_destino_id: null,
+        site_intervention: siteIntervention.trim(),
+        pilier_intervention: pilierIntervention,
         items,
       });
       alert('Requisição enviada com sucesso! Aguarde aprovação.');
@@ -538,6 +542,8 @@ function MateriaisContent() {
       setDescricaoDemanda('');
       setSelectedTipoFluxoDemanda('INSTALACAO');
       setDataRetornoPrevistaDemanda('');
+      setSiteIntervention('');
+      setPilierIntervention('');
     } catch (error: any) {
       const data = error.response?.data;
       let apiError = extractApiError(data) || 'Erro ao enviar requisição';
@@ -1516,6 +1522,51 @@ function MateriaisContent() {
                   <input type="datetime-local" className="input input-bordered w-full" value={dataRetornoPrevistaDemanda} onChange={(e) => setDataRetornoPrevistaDemanda(e.target.value)} />
                 </div>
               )}
+
+              {(selectedTipoFluxoDemanda === 'INSTALACAO' || selectedTipoFluxoDemanda === 'EMPRESTIMO') && (
+                <>
+                  <div className="form-control w-full md:col-span-2">
+                    <label className="label">
+                      <span className="label-text font-semibold">
+                        Local / Site de Intervenção <span className="text-error">*</span>
+                      </span>
+                    </label>
+                    <textarea
+                      className="textarea textarea-bordered w-full"
+                      rows={2}
+                      placeholder="Ex: Rua da República, Bairro 22 — substituição de vantouz DN80"
+                      value={siteIntervention}
+                      onChange={(e) => setSiteIntervention(e.target.value)}
+                    />
+                    <label className="label">
+                      <span className="label-text-alt text-base-content/60">Indique o endereço exato ou a descrição do local de intervenção na rede.</span>
+                    </label>
+                  </div>
+                  <div className="form-control w-full md:col-span-2">
+                    <label className="label"><span className="label-text font-semibold">Pilar de Intervenção <span className="text-error">*</span></span></label>
+                    <div className="flex flex-wrap gap-4 mt-1">
+                      {[
+                        { value: 'PILAR1', label: 'Pilar 1 — ETA Kifangondo' },
+                        { value: 'PILAR2', label: 'Pilar 2 — CD Marçal' },
+                        { value: 'PILAR3', label: 'Pilar 3' },
+                      ].map((p) => (
+                        <label key={p.value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="pilier_intervention"
+                            className="radio radio-primary"
+                            value={p.value}
+                            checked={pilierIntervention === p.value}
+                            onChange={() => setPilierIntervention(p.value)}
+                          />
+                          <span className="label-text">{p.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="form-control w-full">
                 <label className="label"><span className="label-text font-semibold">Empresa demandante</span></label>
                 <select className="select select-bordered w-full" value={selectedDemandeurReelId} onChange={(e) => setSelectedDemandeurReelId(e.target.value)}>

@@ -634,6 +634,18 @@ class Mouvement(models.Model):
     demandeur = models.ForeignKey(Utilisateur, on_delete=models.SET_NULL, null=True,
                                  related_name='mouvements_demandes')
     fournisseur = models.ForeignKey(Fournisseur, on_delete=models.SET_NULL, null=True, blank=True)
+    site_intervention = models.CharField(
+        "Local / Site de Intervenção",
+        max_length=500,
+        blank=True,
+        default='',
+    )
+    pilier_intervention = models.CharField(
+        "Pilar de Intervenção",
+        max_length=10,
+        blank=True,
+        default='',
+    )
 
     def save(self, *args, **kwargs):
         if not self.reference:
@@ -691,6 +703,23 @@ class DemandeLot(models.Model):
     description = models.TextField("Justificativa", blank=True)
     raison_refus = models.TextField("Motivo da Recusa", blank=True, null=True)
     is_consultation = models.BooleanField(default=False)
+    site_intervention = models.CharField(
+        "Local / Site de Intervenção",
+        max_length=500,
+        blank=True,
+        default='',
+    )
+    pilier_intervention = models.CharField(
+        "Pilar de Intervenção",
+        max_length=10,
+        blank=True,
+        default='',
+        choices=(
+            ('PILAR1', 'Pilar 1 — ETA Kifangondo'),
+            ('PILAR2', 'Pilar 2 — CD Marçal'),
+            ('PILAR3', 'Pilar 3'),
+        ),
+    )
     reference = models.CharField("Referencia", max_length=20, unique=True, blank=True, null=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -808,7 +837,9 @@ class DemandeLot(models.Model):
                     materiel=item.materiel,
                     entrepot=entrepot,
                     demandeur=approuveur,
-                    raison=f'Apwouve demann #{self.id}'
+                    raison=f'Apwouve demann #{self.id}',
+                    site_intervention=self.site_intervention or '',
+                    pilier_intervention=self.pilier_intervention or '',
                 )
 
     def refuser(self, raison):

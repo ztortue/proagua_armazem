@@ -20,7 +20,66 @@ type User = {
   role: Role;
   pilier_affectation?: PilierAffectation;
   is_active?: boolean;
+  last_login?: string | null;
+  last_activity?: string | null;
 };
+
+type OnlineStatus = 'online' | 'recent' | 'today' | 'inactive';
+
+function getOnlineStatus(user: User): OnlineStatus {
+  const activity = user.last_activity ? new Date(user.last_activity) : null;
+  if (!activity) return 'inactive';
+  const diffMin = (Date.now() - activity.getTime()) / 60000;
+  if (diffMin < 15) return 'online';
+  if (diffMin < 60) return 'recent';
+  const isToday = activity.toDateString() === new Date().toDateString();
+  if (isToday) return 'today';
+  return 'inactive';
+}
+
+function OnlineBadge({ user }: { user: User }) {
+  const status = getOnlineStatus(user);
+  const activity = user.last_activity ? new Date(user.last_activity) : null;
+  const login = user.last_login ? new Date(user.last_login) : null;
+
+  if (status === 'online') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-success" />
+        </span>
+        <span className="text-xs font-semibold text-success">En ligne</span>
+      </div>
+    );
+  }
+  if (status === 'recent') {
+    return (
+      <div className="flex items-center gap-1.5" title={activity?.toLocaleString('pt-BR')}>
+        <span className="h-2.5 w-2.5 rounded-full bg-warning inline-block" />
+        <span className="text-xs text-warning font-medium">
+          {Math.round((Date.now() - activity!.getTime()) / 60000)} min
+        </span>
+      </div>
+    );
+  }
+  if (status === 'today') {
+    return (
+      <div className="flex items-center gap-1.5" title={activity?.toLocaleString('pt-BR')}>
+        <span className="h-2.5 w-2.5 rounded-full bg-info inline-block" />
+        <span className="text-xs text-info">Hoje {activity!.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5 opacity-50">
+      <span className="h-2.5 w-2.5 rounded-full bg-base-content/40 inline-block" />
+      <span className="text-xs">
+        {login ? login.toLocaleDateString('pt-BR') : 'Nunca'}
+      </span>
+    </div>
+  );
+}
 
 type Me = User;
 
@@ -69,6 +128,7 @@ function UsersContent() {
   const [roleFilter, setRoleFilter] = useState<'TODOS' | Role>('TODOS');
   const [pilierFilter, setPilierFilter] = useState<'TODOS' | PilierAffectation>('TODOS');
   const [activeFilter, setActiveFilter] = useState<'TODOS' | 'ATIVO' | 'INATIVO'>('TODOS');
+  const [onlineFilter, setOnlineFilter] = useState<'TODOS' | 'ONLINE'>('TODOS');
   const [autoEditDone, setAutoEditDone] = useState(false);
 
   const canManageUsers = useMemo(() => {
@@ -254,6 +314,11 @@ function UsersContent() {
     }
   }, [loadingUsers, autoEditDone, searchParams, users, router]);
 
+  const onlineCount = useMemo(
+    () => users.filter((u) => getOnlineStatus(u) === 'online').length,
+    [users]
+  );
+
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
@@ -261,6 +326,7 @@ function UsersContent() {
       if (pilierFilter !== 'TODOS' && (u.pilier_affectation || 'TODOS') !== pilierFilter) return false;
       if (activeFilter === 'ATIVO' && u.is_active === false) return false;
       if (activeFilter === 'INATIVO' && u.is_active !== false) return false;
+      if (onlineFilter === 'ONLINE' && getOnlineStatus(u) !== 'online') return false;
       if (!q) return true;
       const full = `${u.first_name || ''} ${u.last_name || ''}`.trim().toLowerCase();
       return (
@@ -271,7 +337,7 @@ function UsersContent() {
         (u.poste || '').toLowerCase().includes(q)
       );
     });
-  }, [users, search, roleFilter, pilierFilter, activeFilter]);
+  }, [users, search, roleFilter, pilierFilter, activeFilter, onlineFilter]);
 
   if (loadingMe) return <div className="p-6">Loading...</div>;
   if (!me) return <div className="p-6 text-red-600">{error || 'Sem autenticacao.'}</div>;
@@ -279,11 +345,24 @@ function UsersContent() {
 
   return (
     <div className="mx-auto max-w-7xl p-6 space-y-6">
-      <div className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
-        <h1 className="text-3xl font-bold text-primary">Gestão de Utilizadores</h1>
-        <p className="mt-1 text-sm text-base-content/70">
-          Conectado como: <b>{me.username}</b> ({me.role})
-        </p>
+      <div className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">Gestão de Utilizadores</h1>
+          <p className="mt-1 text-sm text-base-content/70">
+            Conectado como: <b>{me.username}</b> ({me.role})
+          </p>
+        </div>
+        {onlineCount > 0 && (
+          <div className="flex items-center gap-2 bg-success/10 border border-success/30 rounded-xl px-4 py-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-success" />
+            </span>
+            <span className="text-sm font-semibold text-success">
+              {onlineCount} utilizador{onlineCount > 1 ? 'es' : ''} en ligne
+            </span>
+          </div>
+        )}
       </div>
 
       {(error || success) && (
@@ -407,37 +486,41 @@ function UsersContent() {
       </form>
 
       <div className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
-        <div className="flex itemscenter justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h2 className="text-lg font-semibold text-primary">Utilizadores ({filteredUsers.length}/{users.length})</h2>
           <button className="btn btn-sm btn-outline" onClick={loadUsers} type="button">
-            Atualizar
+            ↻ Atualizar
           </button>
         </div>
 
-        <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-5 gap-3">
           <input
             className="input input-bordered w-full"
             placeholder="Pesquisar username, nome, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <select className="select select-bordered w-full" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as any)}>
+          <select className="select select-bordered w-full" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as Role | 'TODOS')}>
             <option value="TODOS">Todos perfis</option>
             <option value="ADMIN">Administrador</option>
             <option value="MANAGER">Gestor</option>
             <option value="USER">Usuário</option>
             <option value="CONSULTATION">Consulta</option>
           </select>
-          <select className="select select-bordered w-full" value={pilierFilter} onChange={(e) => setPilierFilter(e.target.value as any)}>
+          <select className="select select-bordered w-full" value={pilierFilter} onChange={(e) => setPilierFilter(e.target.value as PilierAffectation | 'TODOS')}>
             <option value="TODOS">Todos pilares</option>
             <option value="PILAR1">PILAR1</option>
             <option value="PILAR2">PILAR2</option>
             <option value="PILAR3">PILAR3</option>
           </select>
-          <select className="select select-bordered w-full" value={activeFilter} onChange={(e) => setActiveFilter(e.target.value as any)}>
+          <select className="select select-bordered w-full" value={activeFilter} onChange={(e) => setActiveFilter(e.target.value as 'TODOS' | 'ATIVO' | 'INATIVO')}>
             <option value="TODOS">Ativos + Inativos</option>
-            <option value="ATIVO">So ativos</option>
-            <option value="INATIVO">So inativos</option>
+            <option value="ATIVO">Só ativos</option>
+            <option value="INATIVO">Só inativos</option>
+          </select>
+          <select className="select select-bordered w-full" value={onlineFilter} onChange={(e) => setOnlineFilter(e.target.value as 'TODOS' | 'ONLINE')}>
+            <option value="TODOS">Todos</option>
+            <option value="ONLINE">🟢 En ligne agora</option>
           </select>
         </div>
 
@@ -447,15 +530,15 @@ function UsersContent() {
           <div className="overflow-auto rounded-xl border border-base-300">
             <table className="table table-zebra min-w-full">
               <thead>
-                <tr className="text-left">
+                <tr className="text-left text-xs">
                   <th>Username</th>
                   <th>Nome</th>
                   <th>Email</th>
                   <th>Perfil</th>
                   <th>Pilar</th>
                   <th>Departamento</th>
-                  <th>Cargo</th>
                   <th>Estado</th>
+                  <th>Atividade</th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -463,20 +546,30 @@ function UsersContent() {
                 {filteredUsers.map((u) => (
                   <tr key={u.id} className="border-b">
                     <td>
-                      <Link href={`/dashboard/users/${u.id}`} className="link link-primary font-medium">
+                      <Link href={`/dashboard/users/${u.id}`} className="link link-primary font-medium text-sm">
                         {u.username}
                       </Link>
                     </td>
-                    <td>{u.first_name} {u.last_name}</td>
-                    <td>{u.email}</td>
-                    <td>{u.role}</td>
-                    <td>{u.pilier_affectation || 'TODOS'}</td>
-                    <td>{u.service || '-'}</td>
-                    <td>{u.poste || '-'}</td>
+                    <td className="text-sm">{u.first_name} {u.last_name}</td>
+                    <td className="text-xs text-base-content/70">{u.email}</td>
                     <td>
-                      <span className={`badge ${u.is_active === false ? 'badge-warning' : 'badge-success'}`}>
+                      <span className={`badge badge-sm ${
+                        u.role === 'ADMIN' ? 'badge-error' :
+                        u.role === 'MANAGER' ? 'badge-warning' :
+                        u.role === 'CONSULTATION' ? 'badge-ghost' : 'badge-info'
+                      }`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="text-xs">{u.pilier_affectation || 'TODOS'}</td>
+                    <td className="text-xs text-base-content/70">{u.service || '-'}</td>
+                    <td>
+                      <span className={`badge badge-sm ${u.is_active === false ? 'badge-warning' : 'badge-success'}`}>
                         {u.is_active === false ? 'Inativo' : 'Ativo'}
                       </span>
+                    </td>
+                    <td className="min-w-[110px]">
+                      <OnlineBadge user={u} />
                     </td>
                     <td>
                       <div className="flex gap-2">

@@ -1,4 +1,6 @@
 import logging
+from django.utils import timezone
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -23,4 +25,21 @@ class JWTDebugMiddleware:
             logger.error(f"User authenticated: {request.user.is_authenticated}")
             logger.error(f"User: {request.user}")
         
+        return response
+
+
+class LastActivityMiddleware:
+    """Met à jour last_activity au plus une fois par minute par utilisateur authentifié."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated:
+            now = timezone.now()
+            last = getattr(user, 'last_activity', None)
+            if last is None or (now - last) > timedelta(minutes=1):
+                type(user).objects.filter(pk=user.pk).update(last_activity=now)
         return response

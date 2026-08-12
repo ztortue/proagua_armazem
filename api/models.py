@@ -66,6 +66,7 @@ class Utilisateur(AbstractUser):
         choices=PILIER_AFFECTATION_CHOICES,
         default='TODOS',
     )
+    last_activity = models.DateTimeField("Última Atividade", null=True, blank=True)
 
     def __str__(self):
         return self.get_full_name() or self.username

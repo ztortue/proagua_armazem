@@ -8,6 +8,9 @@ from django.utils.dateparse import parse_date
 from django.http import HttpResponse
 from django.forms.models import model_to_dict
 import csv
+import io
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework import viewsets, permissions, status
@@ -445,6 +448,96 @@ class StockEntrepotViewSet(viewsets.ModelViewSet):
             qs = qs.filter(quantite__gt=int(quantite_gt))
 
         return qs.order_by('-quantite')
+
+    @action(detail=False, methods=['get'], url_path='export-excel', permission_classes=[IsAuthenticated])
+    def export_excel(self, request):
+        qs = self.get_queryset().select_related(
+            'materiel', 'entrepot', 'entrepot__projet', 'emplacement'
+        )
+
+        # Filtros opcionais passados pela query string
+        entrepot_id = request.query_params.get('entrepot')
+        status_filter = request.query_params.get('status')
+        if entrepot_id and str(entrepot_id).isdigit():
+            qs = qs.filter(entrepot_id=int(entrepot_id))
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Inventário'
+
+        # Cabeçalho
+        header_font = Font(bold=True, color='FFFFFF')
+        header_fill = PatternFill(fill_type='solid', fgColor='1E40AF')
+        header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+        headers = ['Código', 'Descrição', 'Tipo de Uso', 'Depósito', 'Pilar', 'Quantidade', 'Estado', 'Localização Física']
+        col_widths = [15, 45, 15, 25, 10, 12, 15, 25]
+
+        for col_idx, (header, width) in enumerate(zip(headers, col_widths), start=1):
+            cell = ws.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            ws.column_dimensions[cell.column_letter].width = width
+
+        ws.row_dimensions[1].height = 30
+
+        STATUS_MAP = {
+            'DISPONIVEL': 'Disponível',
+            'EMPRESTADO': 'Emprestado',
+            'A_INSTALAR': 'A instalar',
+            'INSTALADO': 'Instalado',
+        }
+
+        for row_idx, stock in enumerate(qs, start=2):
+            pilier = ''
+            try:
+                pilier = stock.entrepot.projet.pilier if stock.entrepot.projet else ''
+            except Exception:
+                pass
+
+            emplacement_str = ''
+            if stock.emplacement:
+                emplacement_str = getattr(stock.emplacement, 'adresse_complete', str(stock.emplacement))
+
+            row_data = [
+                stock.materiel.code,
+                stock.materiel.description,
+                stock.materiel.usage_type or '',
+                stock.entrepot.nom,
+                pilier,
+                stock.quantite,
+                STATUS_MAP.get(stock.status, stock.status),
+                emplacement_str,
+            ]
+
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell.alignment = Alignment(vertical='center')
+                if col_idx == 6:  # Quantidade — centraliser
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+
+            # Linha par (fond léger)
+            if row_idx % 2 == 0:
+                light_fill = PatternFill(fill_type='solid', fgColor='EFF6FF')
+                for col_idx in range(1, len(headers) + 1):
+                    ws.cell(row=row_idx, column=col_idx).fill = light_fill
+
+        ws.freeze_panes = 'A2'
+
+        filename = f"inventaire_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
     def perform_create(self, serializer):
         stock = serializer.save()

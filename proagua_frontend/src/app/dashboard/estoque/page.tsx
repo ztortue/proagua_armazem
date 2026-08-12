@@ -130,6 +130,31 @@ function StockContent() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleExportExcel() {
+    setDownloading(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedEntrepot !== 'all') params.set('entrepot', selectedEntrepot);
+      const res = await api.get(`/estoques/export-excel/?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `inventaire_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert('Erro ao exportar. Tente novamente.');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   if (loading) return (
     <div className="flex justify-center itemscenter min-h-screen">
       <span className="loading loading-spinner loading-lg"></span>
@@ -197,6 +222,20 @@ function StockContent() {
             </option>
           ))}
         </select>
+
+        <button
+          type="button"
+          onClick={handleExportExcel}
+          disabled={downloading}
+          className="btn btn-success gap-2 whitespace-nowrap"
+        >
+          {downloading ? (
+            <span className="loading loading-spinner loading-sm" />
+          ) : (
+            <span>📥</span>
+          )}
+          {downloading ? 'A exportar…' : 'Exportar Excel'}
+        </button>
       </div>
 
       <div className="overflow-x-auto shadow-2xl rounded-xl border">

@@ -51,8 +51,11 @@ class UtilisateurSerializer(serializers.ModelSerializer):
             'role',
             'pilier_affectation',
             'is_active',
-            'password'
+            'last_login',
+            'last_activity',
+            'password',
         ]
+        read_only_fields = ['last_login', 'last_activity']
         extra_kwargs = {
             'password': {'write_only': True},
             'email': {'required': False},

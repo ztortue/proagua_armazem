@@ -1,5 +1,6 @@
 import logging
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
@@ -41,5 +42,5 @@ class LastActivityMiddleware:
             now = timezone.now()
             last = getattr(user, 'last_activity', None)
             if last is None or (now - last) > timedelta(minutes=1):
-                type(user).objects.filter(pk=user.pk).update(last_activity=now)
+                get_user_model().objects.filter(pk=user.pk).update(last_activity=now)
         return response

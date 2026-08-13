@@ -2,6 +2,7 @@
 # Install with: pip install -r requirements.txt
 
 amqp==5.3.1
+openpyxl==3.1.5
 asgiref==3.10.0
 billiard==4.2.3
 celery==5.5.3

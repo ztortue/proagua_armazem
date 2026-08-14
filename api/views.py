@@ -1924,6 +1924,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 class UtilisateurViewSet(viewsets.ModelViewSet):
     queryset = Utilisateur.objects.all().order_by('first_name')
     serializer_class = UtilisateurSerializer
+    pagination_class = None
 
     def get_permissions(self):
         # ✅ LIST & RETRIEVE - TOUT MOUN KA WÈ

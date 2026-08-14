@@ -50,6 +50,7 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/dashboard/devolucoes', label: 'Devoluções', icon: TruckIcon, iconColor: 'text-warning', iconClassName: '-scale-x-100', usePilierFilter: true },
   { href: '/dashboard/movimentos', label: 'Movimentos', icon: TruckIcon, iconColor: 'text-accent', usePilierFilter: true },
   { href: '/dashboard/movimentos/por-site', label: 'Por Site', icon: MapPinIcon, iconColor: 'text-secondary', usePilierFilter: true },
+  { href: '/dashboard/movimentos/por-materiel', label: 'Por Material', icon: MagnifyingGlassIcon, iconColor: 'text-accent', usePilierFilter: true },
   { href: '/dashboard/relatorios', label: 'Relatórios', icon: QueueListIcon, iconColor: 'text-info', usePilierFilter: true, managerOrAdmin: true },
   { href: '/dashboard/audit-logs', label: 'Auditoria', icon: QueueListIcon, iconColor: 'text-warning', adminOnly: true },
   { href: '/dashboard/profile', label: 'Perfil', icon: UserCircleIcon, iconColor: 'text-primary' },

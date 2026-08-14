@@ -599,7 +599,7 @@ class MouvementViewSet(viewsets.ModelViewSet):
                 Q(entrepot__projet__pilier=pilier) | Q(projet__pilier=pilier)
             ).distinct()
 
-        # Filtre par site d'intervention (recherche partielle, insensible à la casse)
+        # Filtre par site d'intervention
         site_q = self.request.query_params.get('site', '').strip()
         if site_q:
             qs = qs.filter(site_intervention__icontains=site_q, type_mvt='SORTIE')
@@ -608,6 +608,25 @@ class MouvementViewSet(viewsets.ModelViewSet):
         pilier_q = self.request.query_params.get('pilier', '').strip()
         if pilier_q:
             qs = qs.filter(pilier_intervention=pilier_q)
+
+        # Filtre par matériel (IDs séparés par virgule)
+        materiel_ids_q = self.request.query_params.get('materiel_ids', '').strip()
+        if materiel_ids_q:
+            ids = [i for i in materiel_ids_q.split(',') if i.strip().isdigit()]
+            if ids:
+                qs = qs.filter(materiel__id__in=ids)
+
+        # Filtre par plage de dates
+        date_from = self.request.query_params.get('date_from', '').strip()
+        date_to = self.request.query_params.get('date_to', '').strip()
+        if date_from:
+            parsed = parse_date(date_from)
+            if parsed:
+                qs = qs.filter(date_mvt__date__gte=parsed)
+        if date_to:
+            parsed = parse_date(date_to)
+            if parsed:
+                qs = qs.filter(date_mvt__date__lte=parsed)
 
         return qs.order_by('-date_mvt')
 

@@ -313,6 +313,8 @@ class MaterielSerializer(serializers.ModelSerializer):
 # ===============================================================
 class MouvementSerializer(serializers.ModelSerializer):
     materiel = serializers.StringRelatedField()
+    materiel_id_value = serializers.IntegerField(source='materiel.id', read_only=True)
+    materiel_code = serializers.CharField(source='materiel.code', read_only=True)
     demandeur = serializers.StringRelatedField(default='Sistema')
     entrepot = serializers.StringRelatedField()
     entrepot_id_value = serializers.IntegerField(source='entrepot.id', read_only=True)
@@ -358,7 +360,7 @@ class MouvementSerializer(serializers.ModelSerializer):
         model = Mouvement
         fields = [
             "id", "reference", "date_mvt", "type_mvt", "quantite", "raison",
-            "materiel", "materiel_id",
+            "materiel", "materiel_id_value", "materiel_code", "materiel_id",
             "projet", "projet_id",
             "fournisseur", "fournisseur_id",
             "entrepot", "entrepot_id_value", "entrepot_id", "entrepot_destino_id",

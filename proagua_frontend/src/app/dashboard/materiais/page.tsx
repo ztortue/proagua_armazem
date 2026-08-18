@@ -137,6 +137,7 @@ function MateriaisContent() {
   const [selectedDemandeurReelId, setSelectedDemandeurReelId] = useState('');
   const [descricaoDemanda, setDescricaoDemanda] = useState('');
   const [selectedTipoFluxoDemanda, setSelectedTipoFluxoDemanda] = useState<'INSTALACAO' | 'EMPRESTIMO' | 'COMPRAS' | 'ENTRADA'>('INSTALACAO');
+  const [entrepotDestinoCompras, setEntrepotDestinoCompras] = useState('');
   const [dataRetornoPrevistaDemanda, setDataRetornoPrevistaDemanda] = useState('');
   const [siteIntervention, setSiteIntervention] = useState('');
   const [pilierIntervention, setPilierIntervention] = useState('');
@@ -504,16 +505,23 @@ function MateriaisContent() {
       return;
     }
 
-    const missingEntrepot = selectedItems.find((item) => !selectedEntrepotDemanda[item.id]);
-    if (missingEntrepot) {
-      alert(`Selecione o depósito para ${missingEntrepot.code}.`);
-      return;
+    if (selectedTipoFluxoDemanda === 'COMPRAS') {
+      if (!entrepotDestinoCompras) {
+        alert('Selecione o depósito de destino para a Compra.');
+        return;
+      }
+    } else {
+      const missingEntrepot = selectedItems.find((item) => !selectedEntrepotDemanda[item.id]);
+      if (missingEntrepot) {
+        alert(`Selecione o depósito para ${missingEntrepot.code}.`);
+        return;
+      }
     }
 
     const items = selectedItems.map(item => ({
       materiel_id: item.id,
       quantite_demandee: quantiteDemande[item.id] || 1,
-      entrepot_id: Number(selectedEntrepotDemanda[item.id]),
+      ...(selectedTipoFluxoDemanda !== 'COMPRAS' && { entrepot_id: Number(selectedEntrepotDemanda[item.id]) }),
     }));
 
     try {
@@ -526,7 +534,9 @@ function MateriaisContent() {
           selectedTipoFluxoDemanda === 'EMPRESTIMO' && dataRetornoPrevistaDemanda
             ? new Date(dataRetornoPrevistaDemanda).toISOString()
             : null,
-        entrepot_destino_id: null,
+        entrepot_destino_id: selectedTipoFluxoDemanda === 'COMPRAS' && entrepotDestinoCompras
+          ? Number(entrepotDestinoCompras)
+          : null,
         site_intervention: siteIntervention.trim(),
         pilier_intervention: pilierIntervention,
         items,
@@ -541,6 +551,7 @@ function MateriaisContent() {
       setSelectedDemandeurReelId('');
       setDescricaoDemanda('');
       setSelectedTipoFluxoDemanda('INSTALACAO');
+      setEntrepotDestinoCompras('');
       setDataRetornoPrevistaDemanda('');
       setSiteIntervention('');
       setPilierIntervention('');
@@ -1520,6 +1531,29 @@ function MateriaisContent() {
                 <div className="form-control w-full">
                   <label className="label"><span className="label-text font-semibold">Data/hora prevista de retorno</span></label>
                   <input type="datetime-local" className="input input-bordered w-full" value={dataRetornoPrevistaDemanda} onChange={(e) => setDataRetornoPrevistaDemanda(e.target.value)} />
+                </div>
+              )}
+
+              {selectedTipoFluxoDemanda === 'COMPRAS' && (
+                <div className="form-control w-full">
+                  <label className="label">
+                    <span className="label-text font-semibold">
+                      Depósito de destino <span className="text-error">*</span>
+                    </span>
+                    <span className="label-text-alt text-base-content/60">Onde o material vai entrar em stock</span>
+                  </label>
+                  <select
+                    className="select select-bordered w-full"
+                    value={entrepotDestinoCompras}
+                    onChange={(e) => setEntrepotDestinoCompras(e.target.value)}
+                  >
+                    <option value="">Selecione o depósito de destino</option>
+                    {entrepots.map((ent: any) => (
+                      <option key={ent.id} value={String(ent.id)}>
+                        {ent.nom}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 

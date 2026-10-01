@@ -630,6 +630,74 @@ class MouvementViewSet(viewsets.ModelViewSet):
 
         return qs.order_by('-date_mvt')
 
+    @action(detail=False, methods=['get'], url_path='export-excel')
+    def export_excel(self, request):
+        qs = self.get_queryset()
+
+        type_mvt = request.query_params.get('type_mvt', '').strip()
+        if type_mvt:
+            qs = qs.filter(type_mvt=type_mvt)
+
+        entrepot_id = request.query_params.get('entrepot', '').strip()
+        if entrepot_id and entrepot_id.isdigit():
+            qs = qs.filter(entrepot__id=entrepot_id)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Movimentos'
+
+        header_fill = PatternFill(start_color='2563EB', end_color='2563EB', fill_type='solid')
+        header_font = Font(color='FFFFFF', bold=True, size=11)
+        alt_fill = PatternFill(start_color='EFF6FF', end_color='EFF6FF', fill_type='solid')
+        center = Alignment(horizontal='center', vertical='center')
+
+        headers = ['Data', 'Tipo', 'Material', 'Quantidade', 'Depósito', 'Operador', 'Motivo']
+        col_widths = [20, 14, 40, 12, 25, 20, 30]
+
+        for col_idx, (h, w) in enumerate(zip(headers, col_widths), start=1):
+            cell = ws.cell(row=1, column=col_idx, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center
+            ws.column_dimensions[cell.column_letter].width = w
+
+        ws.freeze_panes = 'A2'
+
+        for row_idx, m in enumerate(qs, start=2):
+            fill = alt_fill if row_idx % 2 == 0 else None
+            material = ''
+            if m.materiel:
+                material = f"{m.materiel.description}" if m.materiel.code else m.materiel.description
+            deposito = m.entrepot.nom if m.entrepot else ''
+            operador = ''
+            if m.demandeur:
+                operador = m.demandeur.get_full_name() or m.demandeur.username
+
+            values = [
+                m.date_mvt.strftime('%d/%m/%Y %H:%M') if m.date_mvt else '',
+                m.type_mvt or '',
+                material,
+                m.quantite,
+                deposito,
+                operador,
+                m.raison or '',
+            ]
+            for col_idx, val in enumerate(values, start=1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                if fill:
+                    cell.fill = fill
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename="movimentos.xlsx"'
+        return response
+
     def perform_create(self, serializer):
         with transaction.atomic():
             mvt = serializer.save(demandeur=self.request.user)

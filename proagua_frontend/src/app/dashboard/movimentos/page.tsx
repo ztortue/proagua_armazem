@@ -53,12 +53,7 @@ function MovimentosContent() {
   const [pageSize, setPageSize] = useState(20);
   const [modalOpen, setModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [exportMode, setExportMode] = useState<'single' | 'range'>('single');
-  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
-  const [exportStartDate, setExportStartDate] = useState('');
-  const [exportEndDate, setExportEndDate] = useState('');
-  const [exportType, setExportType] = useState<'ENTREE' | 'SORTIE'>('ENTREE');
-  const [exportMovId, setExportMovId] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [filterType, setFilterType] = useState('');
   const [filterEntrepot, setFilterEntrepot] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -248,124 +243,31 @@ function MovimentosContent() {
     }
   };
 
-  const buildMovRows = (list: any[]) => {
-    const rows = [
-      [
-        'Referencia',
-        'Data',
-        'Tipo',
-        'Material',
-        'Quantidade',
-        'Deposito',
-        'Motivo',
-      ],
-    ];
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterType) params.set('type_mvt', filterType);
+      if (filterEntrepot) params.set('entrepot', filterEntrepot);
+      if (filterStartDate) params.set('date_from', filterStartDate);
+      if (filterEndDate) params.set('date_to', filterEndDate);
 
-    list.forEach((m) => {
-      const material =
-        m.materiel?.code ? `${m.materiel.code} - ${m.materiel.description}` : (m.materiel || 'N/A');
-      const deposito = m.entrepot?.nom || m.entrepot || '';
-      rows.push([
-        m.reference || '',
-        new Date(m.date_mvt).toLocaleString('pt-BR'),
-        m.type_mvt,
-        material,
-        String(m.quantite),
-        deposito,
-        m.raison || '',
-      ]);
-    });
-
-    return rows;
-  };
-
-  const downloadCsv = (filename: string, rows: string[][]) => {
-    const csv = rows
-      .map((row) =>
-        row
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-          .join(',')
-      )
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
-
-  const printPdf = (title: string, rows: string[][]) => {
-    const win = window.open('', '_blank');
-    if (!win) return;
-    const head = rows[0];
-    const body = rows.slice(1);
-    const tableHtml = `
-      <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;">
-        <thead>
-          <tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr>
-        </thead>
-        <tbody>
-          ${body
-            .map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`)
-            .join('')}
-        </tbody>
-      </table>
-    `;
-
-    win.document.write(`
-      <html>
-        <head>
-          <title>${title}</title>
-          <style>body{font-family:Arial, sans-serif; padding:16px;} h1{font-size:18px;}</style>
-        </head>
-        <body>
-          <h1>${title}</h1>
-          ${tableHtml}
-        </body>
-      </html>
-    `);
-    win.document.close();
-    win.focus();
-    win.print();
-  };
-
-  const handleExport = () => {
-    let list: any[] = [];
-
-    if (exportMode === 'single') {
-      const mov = movimentos.find((m) => String(m.id) === exportMovId);
-      if (!mov) {
-        alert('Selecione um movimento.');
-        return;
-      }
-      list = [mov];
-    } else {
-      if (!exportStartDate || !exportEndDate) {
-        alert('Informe o periodo.');
-        return;
-      }
-      const start = new Date(exportStartDate);
-      const end = new Date(exportEndDate);
-      end.setHours(23, 59, 59, 999);
-      list = movimentos.filter((m) => {
-        const d = new Date(m.date_mvt);
-        return d >= start && d <= end && m.type_mvt === exportType;
+      const res = await api.get(`/movimentos/export-excel/?${params.toString()}`, {
+        responseType: 'blob',
       });
+
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'movimentos.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+      setExportModalOpen(false);
+    } catch {
+      alert('Erro ao exportar. Tente novamente.');
+    } finally {
+      setExporting(false);
     }
-
-    const rows = buildMovRows(list);
-    const suffix = exportType === 'ENTREE' ? 'anexo1' : 'anexo3';
-    const filename = `${suffix}_movimentos.csv`;
-    const title = exportType === 'ENTREE' ? 'Anexo 1 - Recepcao' : 'Anexo 3 - Pedido';
-
-    if (exportFormat === 'csv') {
-      downloadCsv(filename, rows);
-    } else {
-      printPdf(title, rows);
-    }
-
-    setExportModalOpen(false);
   };
 
   if (loading) {
@@ -502,91 +404,31 @@ function MovimentosContent() {
         </table>
       </div>
 
-      {/* MODAL EXPORT */}
+      {/* MODAL EXPORT — confirmação simples */}
       {exportModalOpen && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-2xl">
-            <h3 className="font-bold text-2xl mb-4">Exportar</h3>
-            <div className="space-y-4">
-              <div className="form-control">
-                <label className="label"><span className="label-text">Modo</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={exportMode}
-                  onChange={(e) => setExportMode(e.target.value as 'single' | 'range')}
-                >
-                  <option value="single">Movimento unico</option>
-                  <option value="range">Por periodo</option>
-                </select>
-              </div>
-              <div className="form-control">
-                <label className="label"><span className="label-text">Tipo</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={exportType}
-                  onChange={(e) => setExportType(e.target.value as 'ENTREE' | 'SORTIE')}
-                >
-                  <option value="ENTREE">Recepcao (Anexo 1)</option>
-                  <option value="SORTIE">Pedido (Anexo 3)</option>
-                </select>
-              </div>
-              <div className="form-control">
-                <label className="label"><span className="label-text">Formato</span></label>
-                <select
-                  className="select select-bordered w-full"
-                  value={exportFormat}
-                  onChange={(e) => setExportFormat(e.target.value as 'csv' | 'pdf')}
-                >
-                  <option value="csv">Excel (CSV)</option>
-                  <option value="pdf">PDF</option>
-                </select>
-              </div>
-              {exportMode === 'single' && (
-                <div className="form-control">
-                  <label className="label"><span className="label-text">Movimento</span></label>
-                  <select
-                    className="select select-bordered w-full"
-                    value={exportMovId}
-                    onChange={(e) => setExportMovId(e.target.value)}
-                  >
-                    <option value="">Selecione</option>
-                    {movimentos.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.reference || `#${m.id}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {exportMode === 'range' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label"><span className="label-text">Data inicio</span></label>
-                    <input
-                      type="date"
-                      className="input input-bordered w-full"
-                      value={exportStartDate}
-                      onChange={(e) => setExportStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="label"><span className="label-text">Data fim</span></label>
-                    <input
-                      type="date"
-                      className="input input-bordered w-full"
-                      value={exportEndDate}
-                      onChange={(e) => setExportEndDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="modal-box">
+            <h3 className="font-bold text-lg mb-2">Exportar movimentos</h3>
+            <p className="text-base-content/70 text-sm mb-4">
+              Serão exportados{' '}
+              <span className="font-bold text-primary">{filteredMovimentos.length}</span>{' '}
+              movimento(s) com os filtros activos.
+            </p>
+            {(filterType || filterEntrepot || filterStartDate || filterEndDate) && (
+              <ul className="text-xs text-base-content/60 mb-4 space-y-0.5">
+                {filterType && <li>Tipo: <span className="font-semibold">{filterType}</span></li>}
+                {filterEntrepot && <li>Depósito: <span className="font-semibold">{availableEntrepots.find(e => String(e.id) === filterEntrepot)?.nom || filterEntrepot}</span></li>}
+                {filterStartDate && <li>De: <span className="font-semibold">{filterStartDate}</span></li>}
+                {filterEndDate && <li>Até: <span className="font-semibold">{filterEndDate}</span></li>}
+              </ul>
+            )}
             <div className="modal-action">
-              <button className="btn btn-ghost" onClick={() => setExportModalOpen(false)}>
+              <button className="btn btn-ghost" onClick={() => setExportModalOpen(false)} disabled={exporting}>
                 Cancelar
               </button>
-              <button className="btn btn-primary" onClick={handleExport}>
-                Exportar
+              <button className="btn btn-primary" onClick={handleExport} disabled={exporting}>
+                {exporting ? <span className="loading loading-spinner loading-sm" /> : '📥'}
+                {exporting ? 'A exportar…' : 'Exportar Excel'}
               </button>
             </div>
           </div>
